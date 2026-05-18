@@ -15,8 +15,8 @@ class EquityRequest(BaseModel):
     @field_validator("players")
     @classmethod
     def validate_players(cls, v):
-        if not (2 <= len(v) <= 6):
-            raise ValueError("Must have 2–6 players")
+        if not (2 <= len(v) <= 9):
+            raise ValueError("Must have 2–9 players")
         for hand in v:
             if len(hand) != 2:
                 raise ValueError("Each player must have exactly 2 hole cards")
@@ -36,6 +36,12 @@ class EquityRequest(BaseModel):
             raise ValueError("Simulations must be between 100 and 100,000")
         return v
 
+    @classmethod
+    def validate_simulations(cls, v):
+        if not (100 <= v <= 100000):
+            raise ValueError("Simulations must be between 100 and 100,000")
+        return v
+
 
 class EquityResponse(BaseModel):
     equities: list[float]
@@ -47,6 +53,7 @@ def parse_cards(card_strings: list[str]) -> list[int]:
         return [Card.new(c) for c in card_strings]
     except Exception:
         raise HTTPException(status_code=422, detail=f"Invalid card(s): {card_strings}")
+
 
 
 @router.post("/calculate", response_model=EquityResponse)
