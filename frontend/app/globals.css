@@ -3,6 +3,8 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --felt: #5827ab;          /* rich dark lavender purple */
+  --felt-dark: #2e0c69;     /* outer rail / shadow */
 }
 
 @theme inline {
