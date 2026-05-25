@@ -3,8 +3,33 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --felt: #5827ab;          /* rich dark lavender purple */
-  --felt-dark: #2e0c69;     /* outer rail / shadow */
+  --felt: #1e5a32;          /* forest green */
+  --felt-dark: #000000;     /* outer rail (black) */
+}
+
+/* Dungeon card room — darker brown stone walls with rough fractal-noise
+   texture (cracks/pits emerge organically rather than as straight lines),
+   lit by a single candle overhead plus a faint table glow below. Heavy
+   vignette swallows the corners. */
+.bg-underground {
+  background-color: #14080a;
+  background-image:
+    /* ── Rough stone texture: SVG fractal noise rendered as dark mottling.
+          Bigger pits = lower baseFrequency. Multi-octave gives natural variance.  */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='r'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch' seed='7'/><feComponentTransfer><feFuncA type='discrete' tableValues='0 0 0.1 0.25 0.5 0.7'/></feComponentTransfer><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23r)'/></svg>"),
+
+    /* ── Single main candle overhead ─────────────────────────────────── */
+    radial-gradient(ellipse 38% 26% at 50% 12%, rgba(255, 155, 65, 0.32), rgba(255, 100, 30, 0.10) 55%, transparent 80%),
+
+    /* ── Faint warm glow from the table itself ───────────────────────── */
+    radial-gradient(ellipse 55% 32% at 50% 88%, rgba(255, 130, 50, 0.10), transparent 75%),
+
+    /* ── Heavy vignette: corners go to near-black ────────────────────── */
+    radial-gradient(ellipse 78% 82% at 50% 50%, transparent 25%, rgba(0, 0, 0, 0.82) 100%),
+
+    /* ── Warm brown base gradient (slightly lifted) ──────────────────── */
+    linear-gradient(160deg, #3a1d0c 0%, #1f0d0a 55%, #0a0402 100%);
+  background-attachment: fixed;
 }
 
 @theme inline {
@@ -25,4 +50,67 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Community-card flip-from-deck animation ─────────────────────────────
+   Each board card starts translated to the left at the deck position with
+   rotateY(0) (back facing us), then slides into its slot while rotating
+   180° so the face lands forward. Two stacked faces with backface-visibility
+   = hidden swap who's visible mid-flip. */
+.card-flip-container {
+  display: inline-block;
+}
+.card-flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  /* `both` keeps the FROM state during animation-delay (so the card waits
+     face-down at the deck) AND keeps the TO state after the animation
+     ends (so the card stays face-up after it lands). */
+  animation: card-flip-deal 0.75s ease-out both;
+}
+.card-flip-back,
+.card-flip-face {
+  position: absolute;
+  inset: 0;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.card-flip-face {
+  transform: rotateY(180deg);
+}
+@keyframes card-flip-deal {
+  from { transform: translateX(var(--from-x, 0)) rotateY(0deg); }
+  to   { transform: translateX(0) rotateY(180deg); }
+}
+
+/* ── Hole-card deal: card spins out from the deck (table center) into the
+   player's hand. Each PlayerSeat sets `--card-from-x` / `--card-from-y`
+   to a vector pointing back toward the table center, so seats on different
+   sides of the table see their cards fly in from the correct direction. */
+@keyframes hole-card-deal {
+  from {
+    transform: translate(var(--card-from-x, 0), var(--card-from-y, 0))
+               scale(0.3) rotate(-360deg);
+    opacity: 0;
+  }
+  50% { opacity: 1; }
+  to {
+    transform: translate(0, 0) scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+.hole-card-deal {
+  animation: hole-card-deal 0.5s ease-out backwards;
+}
+
+/* ── Winner avatar gold pulse ──────────────────────────────────────────── */
+@keyframes winner-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.85); }
+  60%  { box-shadow: 0 0 0 18px rgba(251, 191, 36, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+}
+.winner-pulse {
+  animation: winner-pulse 1.4s ease-out infinite;
 }

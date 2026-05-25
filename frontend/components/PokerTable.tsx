@@ -1,0 +1,182 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { GameState, ActionType } from '../types/poker'
+import PlayerSeat from './PlayerSeat'
+import CommunityCards from './CommunityCards'
+import PotDisplay from './PotDisplay'
+import ActionPanel from './ActionPanel'
+import Chip, { chipColorFor } from './Chip'
+
+interface PokerTableProps {
+  state: GameState
+  onAction?: (action: ActionType, amount: number) => void
+  dealtCount?: number
+  isDealing?: boolean
+}
+
+// For seat `s`, when have we dealt them `1` card? After (s - SB) % n cards.
+// Their 2nd card arrives n cards later.
+function cardsDealtToPlayer(seatIndex: number, smallBlindIndex: number, n: number, total: number): number {
+  const orderForCard1 = (seatIndex - smallBlindIndex + n) % n
+  if (total > orderForCard1 + n) return 2
+  if (total > orderForCard1) return 1
+  return 0
+}
+
+// Small component that animates a chip element from the pot center out to a
+// winner's seat once mounted, then fades.
+function WinnerChipFly({
+  toX, toY, color, delay,
+}: { toX: number; toY: number; color: 'white' | 'red' | 'blue' | 'green' | 'black'; delay: number }) {
+  const [arrived, setArrived] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setArrived(true), 50 + delay)
+    return () => clearTimeout(t)
+  }, [delay])
+  return (
+    <div
+      className="absolute z-30 pointer-events-none"
+      style={{
+        left: arrived ? `${toX}%` : '50%',
+        top: arrived ? `${toY}%` : '50%',
+        transform: 'translate(-50%, -50%)',
+        transition: 'left 1.1s ease-out, top 1.1s ease-out, opacity 0.4s ease-out 0.9s',
+        opacity: arrived ? 0 : 1,
+      }}
+    >
+      <Chip color={color} size="md" />
+    </div>
+  )
+}
+
+export default function PokerTable({ state, onAction, dealtCount = 0, isDealing = false }: PokerTableProps) {
+  const n = state.players.length
+  const isShowdown = state.phase === 'showdown'
+
+  return (
+    <div className="relative w-full max-w-6xl mx-auto">
+      <div className="relative aspect-[16/9]">
+        {/* Outer rail */}
+        <div
+          className="absolute inset-0 rounded-[50%] shadow-2xl"
+          style={{ background: 'var(--felt-dark)' }}
+        />
+
+        {/* Inner felt */}
+        <div
+          className="absolute inset-6 rounded-[50%] shadow-inner overflow-visible"
+          style={{ background: 'var(--felt)' }}
+        >
+          {/* Center area: community cards + pot */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-3">
+            <CommunityCards cards={state.communityCards} />
+            <PotDisplay amount={state.pot} />
+          </div>
+        </div>
+
+        {/* Player seats — clockwise from bottom-center. */}
+        {state.players.map((player, i) => {
+          const angle = Math.PI / 2 + (i / n) * 2 * Math.PI
+          const seatX = 50 + 47 * Math.cos(angle)
+          const seatY = 50 + 47 * Math.sin(angle)
+          const visibleCardCount = cardsDealtToPlayer(i, state.smallBlindIndex, n, dealtCount)
+          const isWinner = isShowdown && state.winners.includes(player.id)
+
+          // Hole-card dealing animation origin: a pixel vector pointing from
+          // the seat back toward the table center, so cards visually appear
+          // to come from the deck and spin into the player's hand.
+          const cardOrigin = {
+            x: -Math.cos(angle) * 220,
+            y: -Math.sin(angle) * 150,
+          }
+
+          return (
+            <div
+              key={player.id}
+              className="absolute"
+              style={{
+                left: `${seatX}%`,
+                top: `${seatY}%`,
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              <PlayerSeat
+                player={player}
+                isCurrentPlayer={
+                  state.currentPlayerIndex === i && state.phase === 'playing' && !isDealing
+                }
+                isDealer={state.dealerIndex === i}
+                isLB={state.smallBlindIndex === i}
+                isBB={state.bigBlindIndex === i}
+                showCards={isShowdown}
+                isWinner={isWinner}
+                visibleCardCount={visibleCardCount}
+                cardOrigin={cardOrigin}
+              />
+            </div>
+          )
+        })}
+
+        {/* Bets — between each seat and the pot. */}
+        {state.players.map((player, i) => {
+          if (player.currentBet <= 0) return null
+          const angle = Math.PI / 2 + (i / n) * 2 * Math.PI
+          let betX = 50 + 30 * Math.cos(angle)
+          let betY = 50 + 32 * Math.sin(angle)
+          if (player.isHuman) {
+            betX = 65
+            betY = 87
+          } else if (i === Math.round(n / 2)) {
+            betX = 65
+            betY = 18
+          }
+          return (
+            <div
+              key={`bet-${player.id}`}
+              className="absolute z-10"
+              style={{
+                left: `${betX}%`,
+                top: `${betY}%`,
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              <div className="flex items-center gap-1.5 bg-black/80 px-2.5 py-1 rounded-full shadow-lg border border-amber-500/40">
+                <Chip color={chipColorFor(player.currentBet)} size="sm" />
+                <span className="text-amber-300 text-sm font-bold whitespace-nowrap">
+                  ${player.currentBet}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Winner payout: chips fly from the pot to each winner's seat. */}
+        {isShowdown && state.winners.length > 0 && state.winners.map((winnerId, wIdx) => {
+          const winnerIndex = state.players.findIndex(p => p.id === winnerId)
+          if (winnerIndex < 0) return null
+          const angle = Math.PI / 2 + (winnerIndex / n) * 2 * Math.PI
+          const toX = 50 + 42 * Math.cos(angle)
+          const toY = 50 + 42 * Math.sin(angle)
+          const colors: Array<'white' | 'red' | 'blue' | 'green' | 'black'> = ['black', 'green', 'red']
+          return colors.map((color, cIdx) => (
+            <WinnerChipFly
+              key={`win-${wIdx}-${cIdx}`}
+              toX={toX}
+              toY={toY}
+              color={color}
+              delay={cIdx * 120}
+            />
+          ))
+        })}
+      </div>
+
+      {/* Action panel below the human seat. */}
+      {onAction && (
+        <div className="flex justify-center mt-32">
+          <ActionPanel state={state} onAction={onAction} disabled={isDealing} />
+        </div>
+      )}
+    </div>
+  )
+}

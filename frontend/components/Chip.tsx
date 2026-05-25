@@ -11,6 +11,15 @@ export const CHIP_VALUES: Record<ChipColor, number> = {
 // Ordered lowest → highest for breakdown logic.
 export const CHIP_ORDER: ChipColor[] = ['white', 'red', 'blue', 'green', 'black']
 
+// Pick the chip denomination that best represents a given amount.
+export function chipColorFor(amount: number): ChipColor {
+  if (amount >= 500) return 'black'
+  if (amount >= 100) return 'green'
+  if (amount >= 25)  return 'blue'
+  if (amount >= 5)   return 'red'
+  return 'white'
+}
+
 const STYLES: Record<ChipColor, { face: string; edge: string; text: string }> = {
   white: { face: 'bg-white',       edge: 'border-blue-900', text: 'text-gray-800' },
   red:   { face: 'bg-rose-600',    edge: 'border-white',    text: 'text-white' },
