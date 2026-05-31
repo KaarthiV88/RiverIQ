@@ -3,11 +3,24 @@ export type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'T' | 'J' | '
 export type Card = `${Rank}${Suit}`
 
 export type Street = 'preflop' | 'flop' | 'turn' | 'river' | 'showdown'
-export type GamePhase = 'waiting' | 'playing' | 'showdown'
-export type PlayerStatus = 'active' | 'folded' | 'all-in'
+export type GamePhase =
+  | 'waiting'
+  | 'playing'
+  | 'between-streets'   // betting round just ended; page schedules advance
+  | 'showdown'
+  | 'game-over'         // human busted
+export type PlayerStatus = 'active' | 'folded' | 'all-in' | 'sitting-out' | 'busted'
 export type ActionType = 'fold' | 'check' | 'call' | 'raise' | 'bet'
 export type Position = 'BTN' | 'SB' | 'BB' | 'UTG' | 'UTG+1' | 'UTG+2' | 'LJ' | 'HJ' | 'CO'
-export type BotPersonality = 'tight-passive' | 'tight-aggressive' | 'loose-passive' | 'loose-aggressive'
+export type BotPersonality =
+  | 'nit'
+  | 'tag'
+  | 'lag'
+  | 'calling-station'
+  | 'maniac'
+  | 'home-game'
+  | 'pro'
+  | 'gto-wizard'
 
 export interface Player {
   id: string

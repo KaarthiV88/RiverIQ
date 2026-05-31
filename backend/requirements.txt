@@ -4,3 +4,10 @@ python-dotenv
 pydantic-settings
 pydantic
 treys
+fastapi-cors
+scikit-learn
+numpy
+pandas
+torch
+torchvision
+torchaudio

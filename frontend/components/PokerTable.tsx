@@ -54,9 +54,31 @@ export default function PokerTable({ state, onAction, dealtCount = 0, isDealing 
   const n = state.players.length
   const isShowdown = state.phase === 'showdown'
 
+  // Player whose turn it currently is — used for the "waiting" indicator above
+  // the table when it isn't the human's turn.
+  const currentPlayer = state.players[state.currentPlayerIndex]
+  const showWaiting =
+    state.phase === 'playing'
+    && !isDealing
+    && currentPlayer
+    && !currentPlayer.isHuman
+    && currentPlayer.status === 'active'
+
+  // For larger tables the seats clip against the top of the wrapper because
+  // they sit at the top of the table ellipse. Adding generous top padding to
+  // the outer wrapper gives them breathing room without distorting the felt.
   return (
-    <div className="relative w-full max-w-6xl mx-auto">
-      <div className="relative aspect-[16/9]">
+    <div className="relative w-full max-w-7xl mx-auto pt-24 pb-4">
+      {/* Floating "thinking" indicator above the table. */}
+      {showWaiting && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-black/75 backdrop-blur-md border border-white/15 rounded-full px-4 py-2 shadow-xl">
+          <span className="inline-block w-2 h-2 rounded-full bg-amber-300 animate-pulse" />
+          <span className="text-sm font-semibold text-amber-200">
+            {currentPlayer!.name} is thinking…
+          </span>
+        </div>
+      )}
+      <div className="relative aspect-[16/7.4]">
         {/* Outer rail */}
         <div
           className="absolute inset-0 rounded-[50%] shadow-2xl"
@@ -75,11 +97,13 @@ export default function PokerTable({ state, onAction, dealtCount = 0, isDealing 
           </div>
         </div>
 
-        {/* Player seats — clockwise from bottom-center. */}
+        {/* Player seats — clockwise from bottom-center.
+            Elliptical orbit: wider X, tighter Y to (a) fit more seats on a wider
+            table without overlap and (b) keep top seats from clipping above. */}
         {state.players.map((player, i) => {
           const angle = Math.PI / 2 + (i / n) * 2 * Math.PI
-          const seatX = 50 + 47 * Math.cos(angle)
-          const seatY = 50 + 47 * Math.sin(angle)
+          const seatX = 50 + 48 * Math.cos(angle)
+          const seatY = 50 + 44 * Math.sin(angle)
           const visibleCardCount = cardsDealtToPlayer(i, state.smallBlindIndex, n, dealtCount)
           const isWinner = isShowdown && state.winners.includes(player.id)
 
@@ -122,8 +146,8 @@ export default function PokerTable({ state, onAction, dealtCount = 0, isDealing 
         {state.players.map((player, i) => {
           if (player.currentBet <= 0) return null
           const angle = Math.PI / 2 + (i / n) * 2 * Math.PI
-          let betX = 50 + 30 * Math.cos(angle)
-          let betY = 50 + 32 * Math.sin(angle)
+          let betX = 50 + 32 * Math.cos(angle)
+          let betY = 50 + 28 * Math.sin(angle)
           if (player.isHuman) {
             betX = 65
             betY = 87
@@ -156,8 +180,8 @@ export default function PokerTable({ state, onAction, dealtCount = 0, isDealing 
           const winnerIndex = state.players.findIndex(p => p.id === winnerId)
           if (winnerIndex < 0) return null
           const angle = Math.PI / 2 + (winnerIndex / n) * 2 * Math.PI
-          const toX = 50 + 42 * Math.cos(angle)
-          const toY = 50 + 42 * Math.sin(angle)
+          const toX = 50 + 44 * Math.cos(angle)
+          const toY = 50 + 40 * Math.sin(angle)
           const colors: Array<'white' | 'red' | 'blue' | 'green' | 'black'> = ['black', 'green', 'red']
           return colors.map((color, cIdx) => (
             <WinnerChipFly
@@ -171,9 +195,10 @@ export default function PokerTable({ state, onAction, dealtCount = 0, isDealing 
         })}
       </div>
 
-      {/* Action panel below the human seat. */}
+      {/* Action panel below the human seat. Reserves vertical space so the
+          page doesn't jump when the panel returns null (bot turns / pacing). */}
       {onAction && (
-        <div className="flex justify-center mt-32">
+        <div className="flex justify-center mt-6 min-h-[180px]">
           <ActionPanel state={state} onAction={onAction} disabled={isDealing} />
         </div>
       )}

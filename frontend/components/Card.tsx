@@ -2,7 +2,7 @@ import { Card as CardType } from '../types/poker'
 
 interface CardProps {
   card?: CardType | null  // null/undefined => face down
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'board' | 'lg' | 'xl'
 }
 
 // Convert internal card notation (e.g. "Ah", "Td") into the filename used by
@@ -33,6 +33,7 @@ function toFilename(card: CardType): string {
 const SIZES = {
   sm: 'w-10 h-14',
   md: 'w-14 h-20',
+  board: 'w-[72px] h-[100px]',
   lg: 'w-20 h-28',
   xl: 'w-24 h-36',
 }

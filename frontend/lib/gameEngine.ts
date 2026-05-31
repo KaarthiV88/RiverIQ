@@ -6,19 +6,51 @@ const SMALL_BLIND = 10
 const BIG_BLIND = 20
 export const STARTING_CHIPS = 2000
 
-const BOT_NAMES = ['P. Ivey', 'P. Hellmuth', 'D. Negreanu', 'T. Dwan', 'D. Brunson', 'Tony G', 'Rampage', 'Wolfgang']
-
-const PERSONALITIES: BotPersonality[] = [
-  'tight-passive', 'tight-aggressive', 'loose-passive', 'loose-aggressive',
-  'tight-passive', 'tight-aggressive', 'loose-passive', 'loose-aggressive',
+// Pool of names. A random subset is shuffled per game so the same seat doesn't
+// always show the same face. Mix of real pros + handles for flavor.
+const BOT_NAME_POOL = [
+  'P. Ivey', 'P. Hellmuth', 'D. Negreanu', 'T. Dwan', 'D. Brunson',
+  'Tony G', 'Rampage', 'Wolfgang', 'V. Selbst', 'F. Galfond',
+  'S. Polk', 'P. Antonius', 'L. Veldhuis', 'M. Mateos', 'J. Moneymaker',
+  'C. Robl', 'S. Hua', 'JJ McNutt', 'Cardo', 'B. Slim',
+  'A. Kuro', 'K. Riess', 'B. Holz', 'D. Cates',
 ]
 
-// Positions listed clockwise from BTN (index 0 = BTN)
-const POSITIONS_BY_SIZE: Record<number, Position[]> = {
+function shuffleNames(): string[] {
+  const arr = [...BOT_NAME_POOL]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+const PERSONALITIES: BotPersonality[] = [
+  'pro', 'tag', 'calling-station', 'lag', 'nit', 'maniac', 'home-game', 'gto-wizard',
+]
+
+// Position labels indexed [0] = dealer, [1] = SB, [2] = BB, ... going clockwise.
+// Players who aren't in the hand are simply skipped, so the size key is
+// "number of players in the hand" — not the table layout size.
+const POSITIONS_BY_COUNT: Record<number, Position[]> = {
+  2: ['BTN', 'BB'],                                 // heads-up: dealer is SB; we use 'BTN' label here
+  3: ['BTN', 'SB', 'BB'],
+  4: ['BTN', 'SB', 'BB', 'CO'],
+  5: ['BTN', 'SB', 'BB', 'UTG', 'CO'],
   6: ['BTN', 'SB', 'BB', 'UTG', 'HJ', 'CO'],
   7: ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'HJ', 'CO'],
   8: ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'UTG+2', 'HJ', 'CO'],
   9: ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'UTG+2', 'LJ', 'HJ', 'CO'],
+}
+
+// Statuses that mean "won't be dealt cards next round."
+function willPlayNextHand(p: Player): boolean {
+  return p.chips > 0 && p.status !== 'sitting-out' && p.status !== 'busted'
+}
+
+// Was this player dealt into the current hand? (Used for showdown eligibility.)
+function wasDealtIn(p: Player): boolean {
+  return p.status !== 'sitting-out' && p.status !== 'busted'
 }
 
 // ─── Deck ─────────────────────────────────────────────────────────────────────
@@ -60,18 +92,16 @@ function combinations<T>(arr: T[], k: number): T[][] {
   ]
 }
 
-// Returns a score where higher = better hand
 function scoreFiveCards(cards: Card[]): number {
   const ranks = cards.map(rankValue).sort((a, b) => b - a)
   const suits = cards.map(c => c[1])
-  const B = 15  // base — max card rank is 14
+  const B = 15
 
   const isFlush = suits.every(s => s === suits[0])
 
   let isStraight = false
   let straightHigh = ranks[0]
   if (new Set(ranks).size === 5 && ranks[0] - ranks[4] === 4) isStraight = true
-  // Wheel: A-2-3-4-5
   if (JSON.stringify(ranks) === JSON.stringify([14, 5, 4, 3, 2])) {
     isStraight = true
     straightHigh = 5
@@ -110,7 +140,7 @@ export function getBestHandScore(holeCards: Card[], communityCards: Card[]): num
 function getNextActiveIndex(players: Player[], from: number): number {
   const n = players.length
   let i = (from + 1) % n
-  while (i !== from) {
+  for (let step = 0; step < n; step++) {
     if (players[i].status === 'active') return i
     i = (i + 1) % n
   }
@@ -127,28 +157,64 @@ function getFirstPostFlopActor(players: Player[], dealerIndex: number): number {
   return dealerIndex
 }
 
+function nextEligibleFrom(players: Player[], start: number): number {
+  const n = players.length
+  for (let step = 0; step < n; step++) {
+    const i = (start + step) % n
+    if (willPlayNextHand(players[i])) return i
+  }
+  return start
+}
+
+function activeCount(players: Player[]): number {
+  return players.filter(p => p.status === 'active').length
+}
+
 function isBettingRoundComplete(state: GameState): boolean {
   const active = state.players.filter(p => p.status === 'active')
+  if (active.length === 0) return true
   return active.every(
     p => state.actedThisStreet.includes(p.id) && p.currentBet === state.currentBet
   )
 }
 
+function reassignPositions(players: Player[], dealerIndex: number): Player[] {
+  // Walk around the table starting at the dealer; assign positions to the
+  // players who are in this hand (not busted, not sitting out).
+  const n = players.length
+  const inHandIndices: number[] = []
+  for (let step = 0; step < n; step++) {
+    const i = (dealerIndex + step) % n
+    if (wasDealtIn(players[i])) inHandIndices.push(i)
+  }
+  const positions = POSITIONS_BY_COUNT[inHandIndices.length] ?? POSITIONS_BY_COUNT[6]
+  return players.map((p, i) => {
+    const slot = inHandIndices.indexOf(i)
+    if (slot === -1) return p
+    return { ...p, position: positions[slot] ?? p.position }
+  })
+}
+
 // ─── Game Initialization ──────────────────────────────────────────────────────
 
-export function initGame(tableSize: number): GameState {
-  const positions = POSITIONS_BY_SIZE[tableSize]
+export function initGame(
+  tableSize: number,
+  opponentPersonalities?: BotPersonality[]
+): GameState {
+  const assigned = opponentPersonalities ?? PERSONALITIES.slice(0, tableSize - 1)
+  const positions = POSITIONS_BY_COUNT[tableSize] ?? POSITIONS_BY_COUNT[6]
+  const names = shuffleNames()
   const players: Player[] = Array.from({ length: tableSize }, (_, i) => ({
     id: i === 0 ? 'human' : `bot-${i}`,
-    name: i === 0 ? 'You' : BOT_NAMES[i - 1],
+    name: i === 0 ? 'You' : (names[i - 1] ?? `Bot ${i}`),
     isHuman: i === 0,
     holeCards: [],
     chips: STARTING_CHIPS,
     currentBet: 0,
     totalBetThisHand: 0,
     status: 'active',
-    position: positions[i],
-    personality: i === 0 ? null : PERSONALITIES[i - 1],
+    position: positions[i] ?? 'BTN',
+    personality: i === 0 ? null : (assigned[i - 1] ?? PERSONALITIES[(i - 1) % PERSONALITIES.length]),
     seatIndex: i,
   }))
 
@@ -174,40 +240,76 @@ export function initGame(tableSize: number): GameState {
 
 // ─── Deal New Hand ────────────────────────────────────────────────────────────
 
-export function dealNewHand(state: GameState): GameState {
+export interface DealOptions {
+  humanSittingOut?: boolean   // user pressed Stand: skip dealing them in
+}
+
+export function dealNewHand(state: GameState, opts: DealOptions = {}): GameState {
   const deck = shuffleDeck(createDeck())
-  const n = state.tableSize
+  const n = state.players.length
 
-  const dealerIndex = state.phase === 'waiting' ? 0 : (state.dealerIndex + 1) % n
-  const sbIndex = (dealerIndex + 1) % n
-  const bbIndex = (dealerIndex + 2) % n
-  const firstToAct = (bbIndex + 1) % n
-
-  const positions = POSITIONS_BY_SIZE[n]
-
-  let deckCursor = 0
-  const players: Player[] = state.players.map((p, i) => {
-    const relPos = (i - dealerIndex + n) % n
-    return {
-      ...p,
-      holeCards: [deck[deckCursor++], deck[deckCursor++]] as Card[],
-      currentBet: 0,
-      totalBetThisHand: 0,
-      status: 'active',
-      position: positions[relPos],
+  // Reset everyone for the new hand. `opts.humanSittingOut` is the
+  // authoritative human state for the upcoming hand — it both sits them out
+  // AND brings them back when toggled off, regardless of previous status.
+  const refreshed: Player[] = state.players.map(p => {
+    const base = { ...p, holeCards: [] as Card[], currentBet: 0, totalBetThisHand: 0 }
+    if (p.chips <= 0) return { ...base, status: 'busted' as const }
+    if (p.isHuman) {
+      return { ...base, status: opts.humanSittingOut ? 'sitting-out' as const : 'active' as const }
     }
+    return { ...base, status: 'active' as const }
   })
 
-  // Post blinds immutably
-  const withBlinds = players.map((p, i) => {
-    if (i === sbIndex) return { ...p, chips: p.chips - SMALL_BLIND, currentBet: SMALL_BLIND, totalBetThisHand: SMALL_BLIND }
-    if (i === bbIndex) return { ...p, chips: p.chips - BIG_BLIND, currentBet: BIG_BLIND, totalBetThisHand: BIG_BLIND }
+  // If the human just busted, end the game.
+  const human = refreshed.find(p => p.isHuman)
+  if (human && human.status === 'busted') {
+    return { ...state, players: refreshed, phase: 'game-over' }
+  }
+
+  // If only one playable seat remains, end the game (game-over from the
+  // human's perspective if they're it; otherwise still over since there's
+  // no one to play against).
+  const playable = refreshed.filter(willPlayNextHand)
+  if (playable.length < 2) {
+    return { ...state, players: refreshed, phase: 'game-over' }
+  }
+
+  // Rotate dealer to next eligible.
+  const startFrom = state.phase === 'waiting' ? 0 : (state.dealerIndex + 1) % n
+  const dealerIndex = nextEligibleFrom(refreshed, startFrom)
+  const sbIndex = nextEligibleFrom(refreshed, (dealerIndex + 1) % n)
+  const bbIndex = nextEligibleFrom(refreshed, (sbIndex + 1) % n)
+
+  // Deal cards only to in-hand players.
+  let deckCursor = 0
+  let withCards: Player[] = refreshed.map(p => {
+    if (!willPlayNextHand(p)) return p
+    return { ...p, holeCards: [deck[deckCursor++], deck[deckCursor++]] as Card[], status: 'active' }
+  })
+
+  // Post blinds (clamp to chip stack — short stacks post less, go all-in).
+  withCards = withCards.map((p, i) => {
+    if (i === sbIndex) {
+      const post = Math.min(SMALL_BLIND, p.chips)
+      const status: Player['status'] = p.chips - post === 0 ? 'all-in' : 'active'
+      return { ...p, chips: p.chips - post, currentBet: post, totalBetThisHand: post, status }
+    }
+    if (i === bbIndex) {
+      const post = Math.min(BIG_BLIND, p.chips)
+      const status: Player['status'] = p.chips - post === 0 ? 'all-in' : 'active'
+      return { ...p, chips: p.chips - post, currentBet: post, totalBetThisHand: post, status }
+    }
     return p
   })
 
+  // Recompute positions based on who's actually in this hand.
+  const positioned = reassignPositions(withCards, dealerIndex)
+
+  const firstToAct = getNextActiveIndex(positioned, bbIndex)
+
   return {
     ...state,
-    players: withBlinds,
+    players: positioned,
     communityCards: [],
     pot: SMALL_BLIND + BIG_BLIND,
     street: 'preflop',
@@ -227,27 +329,29 @@ export function dealNewHand(state: GameState): GameState {
 
 // ─── Street Advancement ───────────────────────────────────────────────────────
 
-export function advanceStreet(state: GameState): GameState {
-  const streetOrder: Street[] = ['preflop', 'flop', 'turn', 'river']
-  const nextStreetMap: Record<string, Street> = {
-    preflop: 'flop',
-    flop: 'turn',
-    turn: 'river',
-    river: 'showdown',
-  }
-  const cardsToAdd: Record<string, number> = { preflop: 3, flop: 1, turn: 1 }
+const NEXT_STREET: Record<Street, Street> = {
+  preflop: 'flop',
+  flop: 'turn',
+  turn: 'river',
+  river: 'showdown',
+  showdown: 'showdown',
+}
+const CARDS_TO_ADD: Record<string, number> = { preflop: 3, flop: 1, turn: 1 }
 
+/** Deal the next street's cards. Determines if more betting is possible.
+ *  Called explicitly by the page after the pacing buffer fires. */
+export function advanceStreet(state: GameState): GameState {
   if (state.street === 'river') return determineWinners(state)
 
-  const count = cardsToAdd[state.street]
+  const count = CARDS_TO_ADD[state.street] ?? 0
   const newCommunity = [...state.communityCards, ...state.deck.slice(0, count)] as Card[]
   const newDeck = state.deck.slice(count)
-  const newStreet = nextStreetMap[state.street]
+  const newStreet = NEXT_STREET[state.street]
 
+  // Reset per-street state.
   const players = state.players.map(p => ({ ...p, currentBet: 0 }))
-  const firstToAct = getFirstPostFlopActor(players, state.dealerIndex)
 
-  return {
+  const next: GameState = {
     ...state,
     players,
     communityCards: newCommunity,
@@ -256,14 +360,28 @@ export function advanceStreet(state: GameState): GameState {
     currentBet: 0,
     minRaise: BIG_BLIND,
     actedThisStreet: [],
-    currentPlayerIndex: firstToAct,
   }
+
+  // If 2+ players can still act, normal betting round.
+  if (activeCount(players) >= 2) {
+    return {
+      ...next,
+      phase: 'playing',
+      currentPlayerIndex: getFirstPostFlopActor(players, state.dealerIndex),
+    }
+  }
+
+  // Otherwise no more betting this hand — keep the phase as between-streets
+  // so the page schedules the next card after a pause. If we've already
+  // reached the river with no possible action, go straight to showdown.
+  if (newStreet === 'river') return determineWinners(next)
+  return { ...next, phase: 'between-streets' }
 }
 
 // ─── Winner Determination ─────────────────────────────────────────────────────
 
 export function determineWinners(state: GameState): GameState {
-  const eligible = state.players.filter(p => p.status !== 'folded')
+  const eligible = state.players.filter(p => p.status !== 'folded' && wasDealtIn(p))
 
   if (eligible.length === 1) {
     const winner = eligible[0]
@@ -307,7 +425,6 @@ export function processAction(state: GameState, action: ActionType, amount: numb
     pot += callAmount
     if (updated.chips === 0) updated.status = 'all-in'
   } else {
-    // raise or bet — `amount` is the total the player wants to have bet this street
     const additional = Math.min(amount - player.currentBet, player.chips)
     const raise = (player.currentBet + additional) - currentBet
     minRaise = Math.max(raise, BIG_BLIND)
@@ -334,12 +451,16 @@ export function processAction(state: GameState, action: ActionType, amount: numb
     actedThisStreet,
   }
 
-  // Only one player left — hand is over
-  if (players.filter(p => p.status !== 'folded').length === 1) {
+  // Only one player left → award pot immediately.
+  if (players.filter(p => p.status !== 'folded' && wasDealtIn(p)).length === 1) {
     return determineWinners({ ...next, street: 'showdown', phase: 'showdown' })
   }
 
-  if (isBettingRoundComplete(next)) return advanceStreet(next)
+  // Betting round complete → enter the pacing buffer; page schedules advance.
+  if (isBettingRoundComplete(next)) {
+    if (next.street === 'river') return determineWinners(next)
+    return { ...next, phase: 'between-streets' }
+  }
 
-  return { ...next, currentPlayerIndex: getNextActiveIndex(players, state.currentPlayerIndex) }
+  return { ...next, phase: 'playing', currentPlayerIndex: getNextActiveIndex(players, state.currentPlayerIndex) }
 }

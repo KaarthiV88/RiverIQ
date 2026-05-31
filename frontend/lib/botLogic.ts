@@ -6,11 +6,18 @@ import { getBestHandScore } from './gameEngine'
 // looseness  – additive modifier to perceived hand strength (more loose ⇒ plays more)
 // aggression – probability of choosing a raise over a call when ahead
 
+// Slimmed-down version of the Python personality profiles. The Python
+// backend is authoritative; this exists so the game still runs if the
+// API is unreachable. Same archetype names so behavior stays consistent.
 const PERSONALITY_PARAMS: Record<BotPersonality, { looseness: number; aggression: number }> = {
-  'tight-passive':    { looseness: -0.10, aggression: 0.10 },
-  'tight-aggressive': { looseness: -0.10, aggression: 0.60 },
-  'loose-passive':    { looseness:  0.15, aggression: 0.15 },
-  'loose-aggressive': { looseness:  0.15, aggression: 0.65 },
+  nit:               { looseness: -0.25, aggression: 0.30 },
+  tag:               { looseness: -0.08, aggression: 0.70 },
+  lag:               { looseness:  0.15, aggression: 0.85 },
+  'calling-station': { looseness:  0.20, aggression: 0.10 },
+  maniac:            { looseness:  0.25, aggression: 0.92 },
+  'home-game':       { looseness:  0.12, aggression: 0.45 },
+  pro:               { looseness:  0.00, aggression: 0.72 },
+  'gto-wizard':      { looseness:  0.00, aggression: 0.65 },
 }
 
 // ─── Hand Strength Estimation ─────────────────────────────────────────────────
@@ -72,11 +79,21 @@ function postflopStrength(holeCards: Card[], communityCards: Card[]): number {
 
 // ─── Decision Engine ──────────────────────────────────────────────────────────
 
+const IN_POSITION = new Set(['BTN', 'CO', 'HJ'])
+
+function preflopOpenChance(strength: number, aggression: number): number {
+  if (strength >= 0.85) return Math.min(1, aggression + 0.20)
+  if (strength >= 0.65) return aggression
+  if (strength >= 0.50) return aggression * 0.55
+  if (strength >= 0.40) return aggression * 0.30
+  if (strength >= 0.30) return aggression * 0.10
+  return 0
+}
+
 export function decideBotAction(state: GameState): BotDecision {
   const bot = state.players[state.currentPlayerIndex]
   const personality = bot.personality
   if (!personality) {
-    // Safety: human shouldn't be calling this. Default to check/fold.
     return { action: state.currentBet === bot.currentBet ? 'check' : 'fold', amount: 0 }
   }
 
@@ -84,38 +101,73 @@ export function decideBotAction(state: GameState): BotDecision {
 
   const callAmount = state.currentBet - bot.currentBet
   const potOdds = callAmount > 0 ? callAmount / (state.pot + callAmount) : 0
+  const isPreflop = state.communityCards.length === 0
 
-  let strength =
-    state.communityCards.length === 0
-      ? preflopStrength(bot.holeCards)
-      : postflopStrength(bot.holeCards, state.communityCards)
+  const rawStrength = isPreflop
+    ? preflopStrength(bot.holeCards)
+    : postflopStrength(bot.holeCards, state.communityCards)
 
-  strength += looseness
-  strength += (Math.random() - 0.5) * 0.10  // a bit of noise so bots aren't deterministic
+  let strength = rawStrength + looseness
+  strength += (Math.random() - 0.5) * 0.10
 
-  // No bet to call → check or bet for value
+  const minRaiseTotal = state.currentBet + state.minRaise
+  const maxCommit = bot.chips + bot.currentBet
+  const canRaise = maxCommit >= minRaiseTotal
+  const inPosition = IN_POSITION.has(bot.position)
+
+  // ── No bet to call ────────────────────────────────────────────────
   if (callAmount === 0) {
-    if (strength > 0.65 && Math.random() < aggression) {
+    // Slow-play monster postflop hands sometimes
+    if (!isPreflop && rawStrength >= 0.94 && aggression >= 0.65 && Math.random() < 0.35) {
+      return { action: 'check', amount: 0 }
+    }
+
+    // In-position stab when checked around (aggressive personalities only)
+    if (!isPreflop && inPosition && state.pot > 0 && aggression >= 0.70) {
+      const stabChance = 0.45 + 0.20 * (aggression - 0.70)
+      if (Math.random() < stabChance && canRaise) {
+        const size = Math.floor(state.pot * (0.55 + Math.random() * 0.35))
+        const finalBet = Math.max(minRaiseTotal, Math.min(size + state.currentBet, maxCommit))
+        return { action: 'raise', amount: finalBet }
+      }
+    }
+
+    if (isPreflop) {
+      if (canRaise && Math.random() < preflopOpenChance(strength, aggression)) {
+        const size = Math.floor(20 * 2.8)  // ~2.8 BB open
+        const finalBet = Math.max(minRaiseTotal, Math.min(size, maxCommit))
+        return { action: 'raise', amount: finalBet }
+      }
+      return { action: 'check', amount: 0 }
+    }
+
+    if (strength > 0.65 && Math.random() < aggression && canRaise) {
       const betSize = Math.floor(state.pot * (0.5 + Math.random() * 0.5))
-      const finalBet = Math.max(state.minRaise, Math.min(betSize, bot.chips + bot.currentBet))
+      const finalBet = Math.max(minRaiseTotal, Math.min(betSize + state.currentBet, maxCommit))
       return { action: 'raise', amount: finalBet }
     }
     return { action: 'check', amount: 0 }
   }
 
-  // Facing a bet → fold, call, or raise
+  // ── Facing a bet ──────────────────────────────────────────────────
+  // Check-raise / trap with a true monster
+  if (!isPreflop && rawStrength >= 0.94) {
+    if (Math.random() < 0.65 && canRaise) {
+      const size = Math.floor(state.currentBet * 3.0 + state.pot * 0.6)
+      const finalRaise = Math.max(minRaiseTotal, Math.min(size, maxCommit))
+      return { action: 'raise', amount: finalRaise }
+    }
+    return { action: 'call', amount: callAmount }
+  }
+
   if (strength < potOdds * 1.2) {
     return { action: 'fold', amount: 0 }
   }
 
-  if (strength > 0.75 && Math.random() < aggression) {
-    const minRaiseTotal = state.currentBet + state.minRaise
+  if (strength > 0.75 && Math.random() < aggression && canRaise) {
     const raiseSize = Math.floor(state.currentBet * 2.5 + state.pot * 0.3)
-    const finalRaise = Math.max(minRaiseTotal, Math.min(raiseSize, bot.chips + bot.currentBet))
-
-    if (bot.chips + bot.currentBet >= minRaiseTotal) {
-      return { action: 'raise', amount: finalRaise }
-    }
+    const finalRaise = Math.max(minRaiseTotal, Math.min(raiseSize, maxCommit))
+    return { action: 'raise', amount: finalRaise }
   }
 
   return { action: 'call', amount: callAmount }

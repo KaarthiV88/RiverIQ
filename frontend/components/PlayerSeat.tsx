@@ -29,14 +29,17 @@ export default function PlayerSeat({
 }: PlayerSeatProps) {
   const isFolded = player.status === 'folded'
   const isAllIn = player.status === 'all-in'
+  const isSittingOut = player.status === 'sitting-out'
+  const isBusted = player.status === 'busted'
+  const isOut = isFolded || isSittingOut || isBusted
   const revealCards = player.isHuman || showCards
-  // Folded players: cards are taken away. Don't render them at all.
-  const cardsToShow = isFolded ? [] : player.holeCards.slice(0, visibleCardCount)
+  // Out-of-hand players: cards are taken away.
+  const cardsToShow = isOut ? [] : player.holeCards.slice(0, visibleCardCount)
 
   return (
     <div
       className={`relative flex flex-col items-center gap-1 transition-all
-        ${isFolded ? 'opacity-40' : ''}
+        ${isOut ? 'opacity-40' : ''}
         ${isCurrentPlayer ? 'scale-110' : ''}
       `}
     >
@@ -73,10 +76,15 @@ export default function PlayerSeat({
         <Avatar name={player.name} isHuman={player.isHuman} size="lg" />
       </div>
 
-      {/* Name + chip count card */}
+      {/* Name + chip count card. For the human seat we float it to the right
+          of the avatar so it doesn't push down into the action panel below. */}
       <div
         className={`rounded-lg px-3 py-1.5 text-center min-w-[110px] shadow ${
           isWinner ? 'bg-amber-600/80 ring-2 ring-amber-300' : 'bg-black/65'
+        } ${
+          player.isHuman
+            ? 'absolute left-full top-1/2 ml-3 -translate-y-1/2 whitespace-nowrap'
+            : ''
         }`}
       >
         <div className="text-sm font-semibold text-white truncate">{player.name}</div>
@@ -103,6 +111,20 @@ export default function PlayerSeat({
       {isAllIn && (
         <div className="absolute -top-2 -left-2 bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded shadow">
           ALL-IN
+        </div>
+      )}
+      {isSittingOut && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="bg-zinc-700 text-white text-xs font-bold px-2 py-0.5 rounded -rotate-12 shadow">
+            SITTING OUT
+          </div>
+        </div>
+      )}
+      {isBusted && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="bg-zinc-900 text-rose-400 text-xs font-bold px-2 py-0.5 rounded -rotate-12 shadow border border-rose-500/40">
+            BUSTED
+          </div>
         </div>
       )}
     </div>

@@ -5,6 +5,7 @@ interface GameMenuProps {
   canAddToStack: boolean
   onStand: () => void
   onAddToStack: () => void
+  onReset: () => void
   onLeave: () => void
 }
 
@@ -13,6 +14,7 @@ export default function GameMenu({
   canAddToStack,
   onStand,
   onAddToStack,
+  onReset,
   onLeave,
 }: GameMenuProps) {
   return (
@@ -39,6 +41,14 @@ export default function GameMenu({
         }
       >
         Add to Stack
+      </button>
+
+      <button
+        onClick={onReset}
+        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold rounded-lg text-sm transition"
+        title="Reroll the lineup and reset every stack"
+      >
+        Reset Table
       </button>
 
       <button
