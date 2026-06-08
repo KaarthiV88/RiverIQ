@@ -84,13 +84,13 @@ PERSONALITIES: dict[str, PersonalityProfile] = {
         policy_weight=0.20,
     ),
     "pro": PersonalityProfile(
-        looseness=0.00, value_threshold=0.62, fold_to_bet_mult=1.10,
+        looseness=0.02, value_threshold=0.62, fold_to_bet_mult=1.10,
         aggression=0.72, bluff_frequency=0.22,
         open_size_bb=2.5, cbet_pot_frac=0.66, randomness=0.08,
         policy_weight=0.70,
     ),
     "gto-wizard": PersonalityProfile(
-        looseness=0.00, value_threshold=0.60, fold_to_bet_mult=1.20,
+        looseness=0.01, value_threshold=0.60, fold_to_bet_mult=1.20,
         aggression=0.65, bluff_frequency=0.25,
         open_size_bb=2.5, cbet_pot_frac=0.50, randomness=0.02,
         policy_weight=0.90,

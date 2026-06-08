@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import PokerTable from '../../components/PokerTable'
 import GameMenu from '../../components/GameMenu'
 import ConfirmModal from '../../components/ConfirmModal'
+import CoachPanel from '../../components/CoachPanel'
 import { GameState, ActionType } from '../../types/poker'
 import {
   initGame, dealNewHand, processAction, advanceStreet, STARTING_CHIPS,
@@ -31,6 +32,7 @@ function GamePageInner() {
   // User's intent to sit out — applied at the next dealNewHand.
   const [sitOutQueued, setSitOutQueued] = useState(false)
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
+  const [coachOpen, setCoachOpen] = useState(false)
 
   // Roll a fresh table: random size 5–9, new controlled-random opponents,
   // fresh stacks for everyone. Used both on initial mount and by the Reset
@@ -279,6 +281,24 @@ function GamePageInner() {
           onCancel={() => { /* no-op — game is already over */ }}
         />
       )}
+
+      {/* Floating coach button — hidden while the panel is open. */}
+      {!coachOpen && (
+        <button
+          onClick={() => setCoachOpen(true)}
+          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold rounded-full shadow-2xl border border-emerald-400/40 transition"
+          title="Ask the coach about this spot"
+        >
+          <span className="inline-block w-2 h-2 rounded-full bg-emerald-200 animate-pulse" />
+          Ask Coach
+        </button>
+      )}
+
+      <CoachPanel
+        open={coachOpen}
+        onClose={() => setCoachOpen(false)}
+        gameState={state}
+      />
     </div>
   )
 }
