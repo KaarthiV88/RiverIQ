@@ -137,11 +137,12 @@ export async function* streamCoachReply(
   messages: CoachMessage[],
   gameContext: CoachGameContext | null,
   signal?: AbortSignal,
+  userId?: string | null,
 ): AsyncGenerator<string, void, unknown> {
   const res = await fetch(`${API_BASE}/coach/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, game_context: gameContext }),
+    body: JSON.stringify({ messages, game_context: gameContext, user_id: userId ?? undefined }),
     signal,
   })
   if (!res.ok || !res.body) {

@@ -8,6 +8,7 @@ import {
   buildGameContext,
   streamCoachReply,
 } from '../lib/coach'
+import { getUserId } from '../lib/userId'
 
 interface CoachPanelProps {
   open: boolean
@@ -106,8 +107,9 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
 
     try {
       const context = buildGameContext(gameState)
+      const userId = getUserId()
       let assistantText = ''
-      for await (const delta of streamCoachReply(outgoing, context, controller.signal)) {
+      for await (const delta of streamCoachReply(outgoing, context, controller.signal, userId)) {
         assistantText += delta
         setEntries(prev => {
           const next = [...prev]

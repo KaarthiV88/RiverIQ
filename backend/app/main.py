@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.bots import orchestrator
-from app.routers import bot, coach, equity
+from app.routers import bot, coach, equity, history
 
 
 @asynccontextmanager
@@ -29,6 +29,7 @@ app.add_middleware(
 app.include_router(equity.router)
 app.include_router(bot.router)
 app.include_router(coach.router)
+app.include_router(history.router)
 
 
 @app.get("/health")

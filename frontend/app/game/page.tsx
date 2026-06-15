@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import PokerTable from '../../components/PokerTable'
 import GameMenu from '../../components/GameMenu'
@@ -13,6 +13,8 @@ import {
 import { decideBotAction } from '../../lib/botLogic'
 import { decideBotApi } from '../../lib/api'
 import { generateOpponents, getDifficulty, randomTableSize } from '../../lib/difficulties'
+import { getUserId } from '../../lib/userId'
+import { buildHandSummary, saveHand } from '../../lib/history'
 
 const BOT_DELAY_MS = 1500
 const SHOWDOWN_DELAY_MS = 4000
@@ -35,6 +37,13 @@ function GamePageInner() {
   const [coachOpen, setCoachOpen] = useState(false)
   const [coachStreaming, setCoachStreaming] = useState(false)
 
+  // Hand-history persistence (Phase 6): track the hero's stack snapshot at the
+  // start of each hand and persist a summary once the hand reaches showdown.
+  // `savedHandRef` guards against duplicate writes since the showdown phase
+  // sticks around for ~4s while winners are animated.
+  const handStartChipsRef = useRef<number | null>(null)
+  const savedHandRef = useRef<boolean>(false)
+
   // Roll a fresh table: random size 5–9, new controlled-random opponents,
   // fresh stacks for everyone. Used both on initial mount and by the Reset
   // button in the game menu.
@@ -49,6 +58,42 @@ function GamePageInner() {
   useEffect(() => {
     rollFreshTable()
   }, [rollFreshTable])
+
+  // Snapshot the hero's stack the moment a new hand enters the "playing"
+  // phase so we can compute net delta at showdown. Resets `savedHandRef` so
+  // the next showdown gets persisted exactly once.
+  useEffect(() => {
+    if (!state || state.phase !== 'playing') return
+    if (handStartChipsRef.current !== null) return
+    const human = state.players.find(p => p.isHuman)
+    if (!human) return
+    // Add back whatever the hero already put in this street (blinds posted
+    // before phase flipped to 'playing' on the very first action) so the
+    // snapshot is the *pre-blind* starting stack.
+    handStartChipsRef.current = human.chips + human.totalBetThisHand
+    savedHandRef.current = false
+  }, [state])
+
+  // Persist the hand summary once on showdown (Phase 6).
+  useEffect(() => {
+    if (!state || state.phase !== 'showdown') return
+    if (savedHandRef.current) return
+    const userId = getUserId()
+    if (!userId) return
+    const starting = handStartChipsRef.current
+    if (starting === null) return
+
+    savedHandRef.current = true
+    const payload = buildHandSummary(state, userId, styleId, starting)
+    if (!payload) return
+
+    saveHand(payload).catch(err => {
+      // Non-fatal — the game keeps running even if persistence is down.
+      console.warn('saveHand failed:', err)
+    })
+    // Reset the start snapshot now so the next 'playing' transition resets it.
+    handStartChipsRef.current = null
+  }, [state, styleId])
 
   const isDealing = !!state && dealtCount < (state.players.length * 2)
 

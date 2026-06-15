@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { DIFFICULTIES } from '../lib/difficulties'
 
 export default function Landing() {
@@ -7,9 +8,24 @@ export default function Landing() {
       <p className="text-lg mb-2 opacity-70 tracking-wide uppercase">
         Texas Hold&apos;em AI Coaching
       </p>
-      <p className="text-base mb-14 opacity-50">
+      <p className="text-base mb-10 opacity-50">
         Pick a table. You&apos;ll meet your opponents when you sit down.
       </p>
+
+      <div className="flex gap-2 mb-10">
+        <Link
+          href="/stats"
+          className="text-sm font-bold px-4 py-2 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-white/10 transition"
+        >
+          Your Stats
+        </Link>
+        <Link
+          href="/history"
+          className="text-sm font-bold px-4 py-2 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-white/10 transition"
+        >
+          Hand History
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 w-full max-w-7xl">
         {DIFFICULTIES.map((diff) => (
