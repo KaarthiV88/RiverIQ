@@ -24,6 +24,8 @@ export interface CoachOpponent {
   current_bet: number
   status: string
   personality: string | null
+  /** Only populated in review mode (post-showdown). */
+  hole_cards?: string[]
 }
 
 export interface CoachHistoryEntry {
@@ -47,13 +49,27 @@ export interface CoachGameContext {
   num_active: number
   opponents: CoachOpponent[]
   history: CoachHistoryEntry[]
+  /** "live" (mid-hand advice) or "review" (post-showdown analysis). */
+  mode: 'live' | 'review'
+  /** Names of showdown winners. Only set in review mode. */
+  winners: string[]
 }
 
-/** Convert a live `GameState` into the backend's coach payload.
+/** Convert a live `GameState` into the backend's coach payload. The mode is
+ *  picked from `phase`: showdown → review (opponents' hole cards exposed,
+ *  winners listed), everything else → live.
+ *
  *  Returns null if there's no human seat (defensive — shouldn't happen). */
 export function buildGameContext(state: GameState): CoachGameContext | null {
   const human = state.players.find(p => p.isHuman)
   if (!human) return null
+
+  const isReview = state.phase === 'showdown'
+  const winnerNames = isReview
+    ? state.winners
+        .map(id => state.players.find(p => p.id === id)?.name)
+        .filter((n): n is string => !!n)
+    : []
 
   return {
     hole_cards: human.holeCards,
@@ -76,6 +92,12 @@ export function buildGameContext(state: GameState): CoachGameContext | null {
         current_bet: p.currentBet,
         status: p.status,
         personality: p.personality,
+        // Only reveal opponents' cards in review mode AND only for players
+        // who were actually dealt in (skip busted/sitting-out).
+        hole_cards:
+          isReview && p.holeCards.length > 0 && p.status !== 'busted' && p.status !== 'sitting-out'
+            ? p.holeCards
+            : undefined,
       })),
     history: state.handHistory.map(a => {
       const actor = state.players.find(p => p.id === a.playerId)
@@ -88,7 +110,25 @@ export function buildGameContext(state: GameState): CoachGameContext | null {
         amount: a.amount,
       }
     }),
+    mode: isReview ? 'review' : 'live',
+    winners: winnerNames,
   }
+}
+
+/** Error type carrying the HTTP status so the UI can render rate-limit
+ *  messages differently from generic failures. */
+export class CoachStreamError extends Error {
+  constructor(public status: number, message: string) {
+    super(message)
+    this.name = 'CoachStreamError'
+  }
+}
+
+function friendlyMessageForStatus(status: number): string {
+  if (status === 429) return 'Coach is rate-limited right now — try again in a few seconds.'
+  if (status >= 500) return 'Coach is temporarily unavailable. Try again shortly.'
+  if (status === 401 || status === 403) return 'Coach auth failed. Check the Groq API key.'
+  return `Coach request failed (${status}).`
 }
 
 /** Stream the coach's reply token-by-token. Yields deltas; the consumer is
@@ -105,7 +145,7 @@ export async function* streamCoachReply(
     signal,
   })
   if (!res.ok || !res.body) {
-    throw new Error(`Coach stream failed: ${res.status}`)
+    throw new CoachStreamError(res.status, friendlyMessageForStatus(res.status))
   }
 
   const reader = res.body.getReader()

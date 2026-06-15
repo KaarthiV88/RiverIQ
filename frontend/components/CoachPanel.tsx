@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { GameState } from '../types/poker'
 import {
   CoachMessage,
+  CoachStreamError,
   buildGameContext,
   streamCoachReply,
 } from '../lib/coach'
@@ -13,51 +14,90 @@ interface CoachPanelProps {
   onClose: () => void
   /** Live game state. A fresh snapshot is captured each time the user sends. */
   gameState: GameState
+  /** Bubble up streaming status so the page can pulse the FAB while closed. */
+  onStreamingChange?: (streaming: boolean) => void
 }
 
-const QUICK_ACTIONS: { label: string; prompt: string }[] = [
+// Chat history may contain a special "divider" entry that visually separates
+// the conversation by hand. Backend never sees these — they're filtered out
+// before sending.
+type ChatEntry =
+  | { kind: 'message'; role: 'user' | 'assistant'; content: string }
+  | { kind: 'divider'; label: string }
+
+const LIVE_ACTIONS: { label: string; prompt: string }[] = [
   { label: 'Analyze this spot', prompt: 'Analyze my current spot. What are the key considerations?' },
   { label: 'Should I fold?', prompt: 'Should I fold here? Why or why not?' },
   { label: "What's my equity?", prompt: "What's my approximate equity here and how does it compare to my pot odds?" },
   { label: 'Read my opponents', prompt: 'What can you tell me about the opponents still in the hand and how should I exploit them?' },
 ]
 
-export default function CoachPanel({ open, onClose, gameState }: CoachPanelProps) {
-  const [messages, setMessages] = useState<CoachMessage[]>([])
+const REVIEW_ACTIONS: { label: string; prompt: string }[] = [
+  { label: 'Review the hand', prompt: 'Review the hand I just played. Walk me through it street by street and highlight the key decisions.' },
+  { label: 'What would you do?', prompt: 'What would you have done differently in this hand?' },
+  { label: 'Biggest mistake?', prompt: "What's the biggest mistake (if any) I made in this hand?" },
+  { label: 'Was my river OK?', prompt: 'Was my river decision correct given the opponent ranges?' },
+]
+
+export default function CoachPanel({ open, onClose, gameState, onStreamingChange }: CoachPanelProps) {
+  const [entries, setEntries] = useState<ChatEntry[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ message: string; status?: number } | null>(null)
+
   const abortRef = useRef<AbortController | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const prevPhaseRef = useRef<GameState['phase']>(gameState.phase)
 
-  // Auto-scroll the message list to the bottom whenever it changes.
+  const isReview = gameState.phase === 'showdown'
+  const quickActions = isReview ? REVIEW_ACTIONS : LIVE_ACTIONS
+
+  // Surface streaming state up to the parent (FAB pulse).
+  useEffect(() => {
+    onStreamingChange?.(streaming)
+  }, [streaming, onStreamingChange])
+
+  // Auto-scroll to bottom on any change.
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight
-  }, [messages, streaming])
+  }, [entries, streaming])
 
-  // Cancel any in-flight stream when the panel closes or the component unmounts.
-  useEffect(() => {
-    if (!open && abortRef.current) {
-      abortRef.current.abort()
-      abortRef.current = null
-      setStreaming(false)
-    }
-  }, [open])
+  // Cancel any in-flight stream on unmount only — closing the panel keeps the
+  // stream alive so the user comes back to a completed answer.
+  useEffect(() => () => abortRef.current?.abort(), [])
 
+  // New-hand divider: fire when phase transitions from 'showdown' (the
+  // previous hand ended) into 'playing' (a fresh hand is being dealt).
   useEffect(() => {
-    return () => abortRef.current?.abort()
-  }, [])
+    const prev = prevPhaseRef.current
+    prevPhaseRef.current = gameState.phase
+    if (prev !== 'showdown' || gameState.phase !== 'playing') return
+    setEntries(prev => {
+      // Don't add a divider if the chat is empty or already ends with one.
+      if (prev.length === 0) return prev
+      const last = prev[prev.length - 1]
+      if (last.kind === 'divider') return prev
+      return [...prev, { kind: 'divider', label: 'New hand' }]
+    })
+  }, [gameState.phase])
 
   const send = useCallback(async (text: string) => {
     const trimmed = text.trim()
     if (!trimmed || streaming) return
     setError(null)
 
-    const userMsg: CoachMessage = { role: 'user', content: trimmed }
-    // Snapshot the conversation we're sending — separate from React state so
-    // we can append assistant deltas without racing the user's next message.
-    const outgoing = [...messages, userMsg]
-    setMessages([...outgoing, { role: 'assistant', content: '' }])
+    // Pull the existing conversation as backend-shaped messages.
+    const outgoing: CoachMessage[] = [
+      ...entries
+        .filter((e): e is Extract<ChatEntry, { kind: 'message' }> => e.kind === 'message')
+        .map(e => ({ role: e.role, content: e.content })),
+      { role: 'user', content: trimmed },
+    ]
+    setEntries(prev => [
+      ...prev,
+      { kind: 'message', role: 'user', content: trimmed },
+      { kind: 'message', role: 'assistant', content: '' },
+    ])
     setInput('')
     setStreaming(true)
 
@@ -69,28 +109,33 @@ export default function CoachPanel({ open, onClose, gameState }: CoachPanelProps
       let assistantText = ''
       for await (const delta of streamCoachReply(outgoing, context, controller.signal)) {
         assistantText += delta
-        setMessages(prev => {
-          // Replace the trailing assistant placeholder with the accumulated text.
+        setEntries(prev => {
           const next = [...prev]
-          next[next.length - 1] = { role: 'assistant', content: assistantText }
+          const last = next[next.length - 1]
+          if (last && last.kind === 'message' && last.role === 'assistant') {
+            next[next.length - 1] = { kind: 'message', role: 'assistant', content: assistantText }
+          }
           return next
         })
       }
     } catch (e: unknown) {
       if ((e as { name?: string } | null)?.name === 'AbortError') return
+      const status = e instanceof CoachStreamError ? e.status : undefined
       const msg = e instanceof Error ? e.message : 'Coach stream failed'
-      setError(msg)
-      // Drop the empty assistant placeholder on hard failure.
-      setMessages(prev => {
+      setError({ message: msg, status })
+      // Drop the empty assistant placeholder so the user can retry cleanly.
+      setEntries(prev => {
         const last = prev[prev.length - 1]
-        if (last && last.role === 'assistant' && last.content === '') return prev.slice(0, -1)
+        if (last && last.kind === 'message' && last.role === 'assistant' && last.content === '') {
+          return prev.slice(0, -1)
+        }
         return prev
       })
     } finally {
       abortRef.current = null
       setStreaming(false)
     }
-  }, [messages, streaming, gameState])
+  }, [entries, streaming, gameState])
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
@@ -101,13 +146,13 @@ export default function CoachPanel({ open, onClose, gameState }: CoachPanelProps
     abortRef.current?.abort()
     abortRef.current = null
     setStreaming(false)
-    setMessages([])
+    setEntries([])
     setError(null)
   }, [])
 
   return (
     <>
-      {/* Backdrop — clicking it closes the panel. */}
+      {/* Backdrop — clicking it closes the panel (stream keeps running). */}
       <div
         className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 ${
           open ? 'opacity-100' : 'opacity-0 pointer-events-none'
@@ -120,15 +165,19 @@ export default function CoachPanel({ open, onClose, gameState }: CoachPanelProps
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
           <div className="flex items-center gap-2">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
             <h2 className="text-lg font-bold text-white">Coach</h2>
             <span className="text-xs text-white/40 font-mono ml-1">Llama 3</span>
+            {isReview && (
+              <span className="ml-2 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold">
+                Review
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {messages.length > 0 && (
+            {entries.length > 0 && (
               <button
                 onClick={clearConversation}
                 className="text-xs px-2 py-1 text-white/60 hover:text-white border border-white/15 rounded-md transition"
@@ -147,53 +196,67 @@ export default function CoachPanel({ open, onClose, gameState }: CoachPanelProps
           </div>
         </div>
 
-        {/* Message list */}
         <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-          {messages.length === 0 && (
+          {entries.length === 0 && (
             <div className="text-white/50 text-sm leading-relaxed">
               <p className="mb-3">
-                Ask anything about your current spot. I can see your hand,
-                the board, the action history, and your opponents&apos; styles.
+                {isReview
+                  ? "The hand's over — ask me to review it, or anything else about the spot."
+                  : "Ask anything about your current spot. I can see your hand, the board, the action history, and your opponents' styles."}
               </p>
-              <p className="text-white/40 text-xs">
-                Quick start — try one of the chips below.
-              </p>
+              <p className="text-white/40 text-xs">Quick start — try a chip below.</p>
             </div>
           )}
 
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+          {entries.map((e, i) => {
+            if (e.kind === 'divider') {
+              return (
+                <div key={i} className="flex items-center gap-3 py-1 select-none">
+                  <div className="flex-1 h-px bg-white/10" />
+                  <span className="text-xs uppercase tracking-wider text-white/40">{e.label}</span>
+                  <div className="flex-1 h-px bg-white/10" />
+                </div>
+              )
+            }
+            return (
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
-                  m.role === 'user'
-                    ? 'bg-amber-500 text-black font-medium rounded-br-sm'
-                    : 'bg-zinc-800 text-white/95 rounded-bl-sm border border-white/5'
-                }`}
+                key={i}
+                className={`flex ${e.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                {m.content || (streaming && i === messages.length - 1 ? (
-                  <span className="inline-flex gap-1 items-center text-white/50 text-xs">
-                    <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-pulse" />
-                    thinking
-                  </span>
-                ) : '')}
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                    e.role === 'user'
+                      ? 'bg-amber-500 text-black font-medium rounded-br-sm'
+                      : 'bg-zinc-800 text-white/95 rounded-bl-sm border border-white/5'
+                  }`}
+                >
+                  {e.content || (streaming && i === entries.length - 1 ? (
+                    <span className="inline-flex gap-1 items-center text-white/50 text-xs">
+                      <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-pulse" />
+                      thinking
+                    </span>
+                  ) : '')}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
 
           {error && (
-            <div className="text-rose-400 text-xs bg-rose-950/40 border border-rose-500/30 rounded-lg px-3 py-2">
-              {error}
+            <div
+              className={`text-xs rounded-lg px-3 py-2 border ${
+                error.status === 429
+                  ? 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+                  : 'bg-rose-950/40 border-rose-500/30 text-rose-300'
+              }`}
+            >
+              {error.message}
             </div>
           )}
         </div>
 
-        {/* Composer */}
         <div className="border-t border-white/10 px-4 py-3 space-y-2 bg-zinc-950">
           <div className="flex flex-wrap gap-1.5">
-            {QUICK_ACTIONS.map(q => (
+            {quickActions.map(q => (
               <button
                 key={q.label}
                 disabled={streaming}

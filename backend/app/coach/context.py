@@ -31,6 +31,9 @@ class OpponentInfo(BaseModel):
     current_bet: float
     status: str            # 'active' | 'folded' | 'all-in' | 'sitting-out' | 'busted'
     personality: str | None = None
+    # Only populated in review mode (post-showdown). Live mode keeps this
+    # empty so the coach can't see hole cards it isn't supposed to.
+    hole_cards: list[str] = Field(default_factory=list)
 
 
 class HistoryEntry(BaseModel):
@@ -58,6 +61,11 @@ class GameContext(BaseModel):
     num_active: int = 0
     opponents: list[OpponentInfo] = Field(default_factory=list)
     history: list[HistoryEntry] = Field(default_factory=list)
+
+    # "live" = mid-hand advice, hide opponents' cards.
+    # "review" = post-showdown analysis, opponents' cards exposed via opp.hole_cards.
+    mode: str = "live"
+    winners: list[str] = Field(default_factory=list)   # player names (review mode)
 
 
 # ── Equity (hero vs N random hands) ──────────────────────────────────────────

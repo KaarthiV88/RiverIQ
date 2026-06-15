@@ -33,6 +33,7 @@ function GamePageInner() {
   const [sitOutQueued, setSitOutQueued] = useState(false)
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
   const [coachOpen, setCoachOpen] = useState(false)
+  const [coachStreaming, setCoachStreaming] = useState(false)
 
   // Roll a fresh table: random size 5–9, new controlled-random opponents,
   // fresh stacks for everyone. Used both on initial mount and by the Reset
@@ -282,15 +283,20 @@ function GamePageInner() {
         />
       )}
 
-      {/* Floating coach button — hidden while the panel is open. */}
+      {/* Floating coach button — hidden while the panel is open. Pulses + shows
+          a "thinking" hint when a background stream is in flight. */}
       {!coachOpen && (
         <button
           onClick={() => setCoachOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold rounded-full shadow-2xl border border-emerald-400/40 transition"
-          title="Ask the coach about this spot"
+          className={`fixed bottom-6 right-6 z-40 flex items-center gap-2 px-5 py-3 active:scale-95 text-white font-bold rounded-full shadow-2xl border transition ${
+            coachStreaming
+              ? 'bg-emerald-500 border-emerald-300 shadow-[0_0_24px_rgba(52,211,153,0.55)] animate-pulse'
+              : 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400/40'
+          }`}
+          title={coachStreaming ? 'Coach is thinking — click to open' : 'Ask the coach about this spot'}
         >
           <span className="inline-block w-2 h-2 rounded-full bg-emerald-200 animate-pulse" />
-          Ask Coach
+          {coachStreaming ? 'Coach is thinking…' : 'Ask Coach'}
         </button>
       )}
 
@@ -298,6 +304,7 @@ function GamePageInner() {
         open={coachOpen}
         onClose={() => setCoachOpen(false)}
         gameState={state}
+        onStreamingChange={setCoachStreaming}
       />
     </div>
   )

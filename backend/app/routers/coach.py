@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from app.coach.context import GameContext
 from app.coach.llm_client import chat, stream_chat
-from app.coach.prompts import SYSTEM_PROMPT, render_context_block
+from app.coach.prompts import render_context_block, system_prompt_for
 
 router = APIRouter(prefix="/coach", tags=["coach"])
 
@@ -45,7 +45,8 @@ def _prepare_messages(messages: list[Message], game_context: GameContext | None)
     if not messages:
         raise HTTPException(status_code=400, detail="messages must not be empty")
 
-    prepared: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    mode = game_context.mode if game_context is not None else "live"
+    prepared: list[dict] = [{"role": "system", "content": system_prompt_for(mode)}]
     if game_context is not None:
         prepared.append({"role": "system", "content": render_context_block(game_context)})
     prepared.extend({"role": m.role, "content": m.content} for m in messages)

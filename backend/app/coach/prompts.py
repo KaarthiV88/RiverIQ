@@ -23,6 +23,20 @@ Honesty:
 When GAME CONTEXT is provided, it includes hero equity (already computed for you), pot odds, SPR, opponent stacks and personality archetypes, and the full action history of this hand. Use these. Reference equity vs. pot odds explicitly when justifying calls."""
 
 
+REVIEW_PROMPT = """You are RiverIQ Coach in REVIEW MODE. The hand is over — opponents' hole cards and the winners are visible to you in the GAME CONTEXT. The hero wants to learn from what just happened, not get advice on what to do next.
+
+Style:
+- Walk through the hand street-by-street. Call out the key decision points (open, c-bet, river spot, etc.).
+- For each one, state what the hero did, whether it was good/bad/neutral, and the higher-EV alternative if there was one.
+- Be concrete: cite equity, pot odds, blockers, opponent type, and the specific holding the opponent turned up.
+- Close with a one-line takeaway — the single most useful thing to remember for next time.
+
+Honesty:
+- Use the revealed opponent cards in your reasoning, but frame the analysis as "given their range was X, your line did/didn't make sense."
+- Don't hindsight-bias: a call that lost to one specific holding can still have been correct vs. the opponent's full range.
+- If the hero asks a question instead of a review, answer the question directly and skip the street-by-street."""
+
+
 # Short, descriptive blurbs the coach can lean on for read-the-player advice.
 PERSONALITY_BLURBS: dict[str, str] = {
     "nit": "very tight & passive — only puts chips in with premiums; folds to most aggression",
@@ -50,6 +64,8 @@ def _opponent_line(opp) -> str:
         bits.append(f"bet {_fmt_money(opp.current_bet)}")
     if opp.status != "active":
         bits.append(opp.status)
+    if opp.hole_cards:
+        bits.append(f"cards: {' '.join(opp.hole_cards)}")
     if opp.personality:
         blurb = PERSONALITY_BLURBS.get(opp.personality, opp.personality)
         bits.append(f"[{opp.personality}: {blurb}]")
@@ -120,4 +136,13 @@ def render_context_block(ctx: GameContext) -> str:
     lines.append("Action history this hand:")
     lines.extend(_history_lines(ctx))
 
+    if ctx.mode == "review" and ctx.winners:
+        lines.append("")
+        lines.append(f"Showdown winners: {', '.join(ctx.winners)}")
+
     return "\n".join(lines)
+
+
+def system_prompt_for(mode: str) -> str:
+    """Pick the right system prompt for the current context mode."""
+    return REVIEW_PROMPT if mode == "review" else SYSTEM_PROMPT
