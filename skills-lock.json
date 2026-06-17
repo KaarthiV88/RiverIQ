@@ -7,6 +7,12 @@
       "skillPath": "skills/frontend-design/SKILL.md",
       "computedHash": "4eabc66183767153e404b39d1b839b1c37f2d82d86f0a0d7e880a579d8d62336"
     },
+    "stop-slop": {
+      "source": "hardikpandya/stop-slop",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "617bf97d33162a6bd0da4f40a97aac589de58e5a6c9cf011ed6108992210e7cb"
+    },
     "web-design-guidelines": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",

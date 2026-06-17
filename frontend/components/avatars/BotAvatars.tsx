@@ -8,7 +8,10 @@
 
 import { JSX } from 'react'
 
-const BG = '#5827ab'  // matches --felt
+// Avatar backdrop — warm felt-room mauve so the head+body pop against it.
+// Earlier value was overridden to read as "table felt" — but the actual felt
+// is now darker/warmer in the redesign, so a warmer mauve here looks correct.
+const BG = '#5827ab'
 
 // ── Reusable building blocks ──────────────────────────────────────────────────
 
@@ -27,7 +30,12 @@ function Head({ skin }: { skin: string }) {
 
 // Baseball cap viewed from the front. Crown sits on top of the head, brim
 // extends straight forward (rendered as a horizontal ellipse).
-function BaseballCap({ color, accent }: { color: string; accent?: string }) {
+// `brimSide` is accepted (and currently a no-op in the front view) so older
+// call sites pass it without TypeScript errors.
+function BaseballCap({
+  color, accent, brimSide,
+}: { color: string; accent?: string; brimSide?: number }) {
+  void brimSide
   return (
     <g>
       {/* Brim (drawn first so it sits behind the crown) */}
@@ -193,6 +201,163 @@ export function Wolfgang() {
   )
 }
 
+// ── Extra building blocks for the archetype pool ─────────────────────────────
+
+// Visor used by old-school grinders. Wide flat brim, no crown.
+function Visor({ color }: { color: string }) {
+  return (
+    <g>
+      <ellipse cx="50" cy="29" rx="28" ry="3" fill={color} />
+      <path d="M 30 30 L 30 27 Q 50 23 70 27 L 70 30 Z" fill={color} />
+    </g>
+  )
+}
+
+// Round wire-frame spectacles.
+function Glasses({ color = '#1a1a1a' }: { color?: string }) {
+  return (
+    <g fill="none" stroke={color} strokeWidth="1.6">
+      <circle cx="42" cy="40" r="5" />
+      <circle cx="58" cy="40" r="5" />
+      <line x1="47" y1="40" x2="53" y2="40" />
+    </g>
+  )
+}
+
+// Flat fedora — narrow brim, low crown.
+function Fedora({ color, band = '#1a1a1a' }: { color: string; band?: string }) {
+  return (
+    <g>
+      <ellipse cx="50" cy="26" rx="28" ry="2.5" fill={color} />
+      <path d="M 36 26 L 36 14 Q 50 8 64 14 L 64 26 Z" fill={color} />
+      <ellipse cx="50" cy="23" rx="14" ry="1.5" fill={band} />
+    </g>
+  )
+}
+
+// Slicked-back hair — short and tight, with a side part.
+function SlickHair({ color }: { color: string }) {
+  return (
+    <g>
+      <path d="M 30 38 Q 50 18 70 38 Q 50 24 30 38 Z" fill={color} />
+      <line x1="46" y1="22" x2="50" y2="34" stroke="rgba(0,0,0,0.35)" strokeWidth="1" />
+    </g>
+  )
+}
+
+// A hood pulled fully up — covers most of the head.
+function FullHood({ color }: { color: string }) {
+  return (
+    <path d="M 18 50 Q 30 12 50 12 Q 70 12 82 50 Q 78 70 50 70 Q 22 70 18 50 Z" fill={color} />
+  )
+}
+
+// Beanie — knit cap pulled down to the ears.
+function Beanie({ color, stripe }: { color: string; stripe?: string }) {
+  return (
+    <g>
+      <path d="M 30 32 Q 30 12 70 12 Q 70 32 70 32 Z" fill={color} />
+      <ellipse cx="50" cy="32" rx="22" ry="3.5" fill={color} />
+      {stripe && <rect x="28" y="22" width="44" height="3" fill={stripe} />}
+    </g>
+  )
+}
+
+// ── Archetype avatars used for any non-named bot ─────────────────────────────
+
+function Cowboy() {
+  return (
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      <Background />
+      <Body color="#7a4226" />
+      <Head skin="#dfa97a" />
+      <CowboyHat color="#2e1808" />
+    </svg>
+  )
+}
+function Visorman() {
+  return (
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      <Background />
+      <Body color="#1e3b2a" />
+      <Head skin="#e8c79d" />
+      <ShortHair color="#1a1208" />
+      <Visor color="#3b2a14" />
+    </svg>
+  )
+}
+function Suit() {
+  return (
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      <Background />
+      <SuitJacket jacketColor="#1f1a14" shirtColor="#f5efdc" tieColor="#8a1c2a" />
+      <Head skin="#dfb98c" />
+      <SlickHair color="#1a1208" />
+    </svg>
+  )
+}
+function Punk() {
+  return (
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      <Background />
+      <Hoodie color="#0a0a0a" hoodColor="#1a1a1a" />
+      <Head skin="#e6b993" />
+      <ShortHair color="#a83232" />
+    </svg>
+  )
+}
+function HoodedGambler() {
+  return (
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      <Background />
+      <Body color="#161310" />
+      <Head skin="#c79a72" />
+      <FullHood color="#161310" />
+    </svg>
+  )
+}
+function OldTimer() {
+  return (
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      <Background />
+      <Body color="#4a342a" />
+      <Head skin="#e0bb95" />
+      <ShortHair color="#cfcfcf" />
+      <Glasses color="#2a1a0a" />
+    </svg>
+  )
+}
+function Captain() {
+  return (
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      <Background />
+      <SuitJacket jacketColor="#0e2240" shirtColor="#f3eddc" />
+      <Head skin="#d9a479" />
+      <Fedora color="#0e2240" band="#b89668" />
+    </svg>
+  )
+}
+function Lady() {
+  return (
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      <Background />
+      <Body color="#5a1e2e" />
+      <Head skin="#eccda4" />
+      <LongHair color="#2b1404" />
+    </svg>
+  )
+}
+function Streetwise() {
+  return (
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      <Background />
+      <Hoodie color="#3d2817" hoodColor="#1f1108" />
+      <Head skin="#cd9572" />
+      <Beanie color="#2a1a0e" stripe="#b89668" />
+    </svg>
+  )
+}
+
 // ── Lookup by display name ────────────────────────────────────────────────────
 
 export const BOT_AVATARS: Record<string, () => JSX.Element> = {
@@ -204,4 +369,22 @@ export const BOT_AVATARS: Record<string, () => JSX.Element> = {
   'Tony G':        TonyG,
   'Rampage':       Rampage,
   'Wolfgang':      Wolfgang,
+}
+
+// Archetypes used when the name doesn't have a hand-drawn match. Stable
+// assignment by name hash so the same bot keeps the same face all session.
+const ARCHETYPES: (() => JSX.Element)[] = [
+  Cowboy, Visorman, Suit, Punk, HoodedGambler, OldTimer, Captain, Lady, Streetwise,
+]
+
+function hash(name: string): number {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+
+export function getBotAvatar(name: string): (() => JSX.Element) | undefined {
+  if (BOT_AVATARS[name]) return BOT_AVATARS[name]
+  if (!name) return undefined
+  return ARCHETYPES[hash(name) % ARCHETYPES.length]
 }

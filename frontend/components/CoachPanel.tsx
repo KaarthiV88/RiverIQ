@@ -17,6 +17,10 @@ interface CoachPanelProps {
   gameState: GameState
   /** Bubble up streaming status so the page can pulse the FAB while closed. */
   onStreamingChange?: (streaming: boolean) => void
+  /** Which side of the AR area the panel docks to. */
+  side: 'left' | 'right'
+  /** Caller controls the side; we just emit the request to flip. */
+  onToggleSide: () => void
 }
 
 // Chat history may contain a special "divider" entry that visually separates
@@ -40,7 +44,7 @@ const REVIEW_ACTIONS: { label: string; prompt: string }[] = [
   { label: 'Was my river OK?', prompt: 'Was my river decision correct given the opponent ranges?' },
 ]
 
-export default function CoachPanel({ open, onClose, gameState, onStreamingChange }: CoachPanelProps) {
+export default function CoachPanel({ open, onClose, gameState, onStreamingChange, side, onToggleSide }: CoachPanelProps) {
   const [entries, setEntries] = useState<ChatEntry[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -154,19 +158,21 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
 
   return (
     <>
-      {/* Backdrop — clicking it closes the panel (stream keeps running). */}
-      <div
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 ${
-          open ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={onClose}
-      />
-
       <aside
-        className={`fixed top-0 right-0 z-50 h-screen w-full max-w-md bg-zinc-950 border-l border-white/10 shadow-2xl flex flex-col transform transition-transform duration-200 ${
-          open ? 'translate-x-0' : 'translate-x-full'
+        className={`coach-panel-hud absolute top-3 bottom-3 z-30 w-[34%] max-w-[420px] min-w-[320px] rounded-md flex flex-col transition-all duration-300 ${
+          side === 'right' ? 'right-3' : 'left-3'
+        } ${
+          open
+            ? 'opacity-100 translate-x-0 pointer-events-auto'
+            : `opacity-0 pointer-events-none ${side === 'right' ? 'translate-x-4' : '-translate-x-4'}`
         }`}
       >
+        {/* Brass corner brackets — same vocabulary as the table reticles so
+            the panel reads as part of the same HUD instrument. */}
+        <span className="hud-corner hud-corner-tl" />
+        <span className="hud-corner hud-corner-tr" />
+        <span className="hud-corner hud-corner-bl" />
+        <span className="hud-corner hud-corner-br" />
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
           <div className="flex items-center gap-2">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
@@ -179,6 +185,15 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
             )}
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onToggleSide}
+              className="coach-side-toggle"
+              aria-label={side === 'right' ? 'Move chat to left side' : 'Move chat to right side'}
+              title={side === 'right' ? 'Dock chat to the left' : 'Dock chat to the right'}
+            >
+              {side === 'right' ? '←' : '→'}
+            </button>
             {entries.length > 0 && (
               <button
                 onClick={clearConversation}
@@ -228,8 +243,8 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
                     e.role === 'user'
-                      ? 'bg-amber-500 text-black font-medium rounded-br-sm'
-                      : 'bg-zinc-800 text-white/95 rounded-bl-sm border border-white/5'
+                      ? 'coach-bubble-user font-medium rounded-br-sm'
+                      : 'coach-bubble-assistant rounded-bl-sm'
                   }`}
                 >
                   {e.content || (streaming && i === entries.length - 1 ? (

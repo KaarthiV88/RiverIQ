@@ -3,8 +3,15 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --felt: #1e5a32;          /* forest green */
-  --felt-dark: #000000;     /* outer rail (black) */
+  /* Old fallback tokens kept for any consumer that still references them. */
+  --felt: #1e5a32;
+  --felt-dark: #000000;
+  /* New table palette — warmer felt with brass + oak trim, matching the
+     landing-page card room aesthetic. */
+  --felt-rich: #264d33;
+  --felt-shade: #15321f;
+  --oak: #3d2817;
+  --oak-shadow: #1f1108;
 }
 
 /* Dungeon card room — darker brown stone walls with rough fractal-noise
@@ -113,4 +120,643 @@ body {
 }
 .winner-pulse {
   animation: winner-pulse 1.4s ease-out infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Landing-page tokens — kept here so the lobby aesthetic stays cohesive
+   across the wordmark, the playing-card tier picker, and the utility links.
+   The palette is deliberately *not* the Tailwind defaults: ink/parchment are
+   the real warm colors of a vintage card stock, brass replaces amber, and
+   wine replaces the bright Tailwind rose-red. ──────────────────────────────── */
+:root {
+  --ink: #0d0c0a;
+  --parchment: #ece3cd;
+  --parchment-shadow: #d9cfb3;
+  --brass: #b89668;
+  --brass-soft: #8b724e;
+  --wine: #8a1c2a;
+  --moss: #3b4a2b;
+  --smoke: #6f6759;
+}
+
+.font-display { font-family: var(--font-bodoni), Georgia, serif; }
+.font-mono    { font-family: var(--font-geist-mono), ui-monospace, monospace; }
+
+/* ─── Playing-card tier picker ─────────────────────────────────────────────
+   Each card uses real playing-card geometry (5:7 portrait), warm parchment
+   stock, mirrored corner indices, and a slight dealt-from-hand tilt. */
+.tier-card {
+  position: relative;
+  background: var(--parchment);
+  color: var(--ink);
+  border-radius: 14px;
+  aspect-ratio: 5 / 7;
+  box-shadow:
+    0 1px 0 rgba(255, 240, 200, 0.18) inset,
+    0 18px 28px -16px rgba(0, 0, 0, 0.7),
+    0 2px 6px rgba(0, 0, 0, 0.45);
+  /* Subtle parchment grain so the cream doesn't read as flat web-cream. */
+  background-image:
+    radial-gradient(ellipse 130% 90% at 50% 0%, rgba(255, 245, 215, 0.5), transparent 60%),
+    radial-gradient(ellipse 120% 100% at 50% 100%, rgba(120, 95, 50, 0.18), transparent 65%);
+  transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 280ms ease;
+  will-change: transform;
+}
+.tier-card::after {
+  /* Inner hairline — like the printed border on a real playing card. */
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(13, 12, 10, 0.12);
+  border-radius: 9px;
+  pointer-events: none;
+}
+/* Dealt tilt — alternating so the row feels hand-placed. The :hover undoes
+   the tilt and lifts the card, mimicking picking it up off the felt. */
+.tier-card[data-tilt="1"] { transform: rotate(-3.2deg) translateY(2px); }
+.tier-card[data-tilt="2"] { transform: rotate( 1.6deg) translateY(0); }
+.tier-card[data-tilt="3"] { transform: rotate(-1.2deg) translateY(3px); }
+.tier-card[data-tilt="4"] { transform: rotate( 2.8deg) translateY(1px); }
+.tier-card:hover,
+.tier-card:focus-visible {
+  transform: rotate(0deg) translateY(-10px);
+  box-shadow:
+    0 1px 0 rgba(255, 240, 200, 0.25) inset,
+    0 28px 36px -18px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(184, 150, 104, 0.45),
+    0 0 36px rgba(184, 150, 104, 0.25);
+  outline: none;
+}
+
+/* Corner index — rank above suit, exactly the geometry of a real card. */
+.corner-index {
+  position: absolute;
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-weight: 700;
+  line-height: 0.85;
+  letter-spacing: -0.02em;
+  user-select: none;
+}
+.corner-index .rank { font-size: 1.35rem; display: block; }
+.corner-index .suit { font-size: 0.85rem; display: block; margin-top: 1px; }
+.corner-index.top    { top: 12px;    left: 14px; }
+.corner-index.bottom { bottom: 12px; right: 14px; transform: rotate(180deg); }
+.suit-red   { color: var(--wine); }
+.suit-black { color: var(--ink); }
+
+.tier-title {
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.tier-tagline {
+  color: var(--brass-soft);
+  font-style: italic;
+}
+.tier-body {
+  color: rgba(13, 12, 10, 0.74);
+}
+.tier-footnote {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--smoke);
+  text-transform: uppercase;
+}
+
+/* Hero brass hairline — used under the wordmark and as a felt-room divider. */
+.brass-rule {
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--brass) 50%, transparent);
+}
+.eyebrow {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   In-game table — oak rail, brass trim ring, worn felt.
+   Stacking order (outer → inner): oak rail, brass ring, felt-shade rim, felt.
+   Each layer uses a real material analog rather than a flat color block. ───── */
+.table-rail {
+  background:
+    /* faint wood grain — long horizontal grain stripes over the base */
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.15) 0 1px,
+      transparent 1px 5px
+    ),
+    /* highlight along the upper edge → shadow toward the lower edge */
+    radial-gradient(ellipse 75% 60% at 50% 30%, rgba(255, 200, 140, 0.18), transparent 70%),
+    radial-gradient(ellipse 90% 80% at 50% 70%, var(--oak-shadow), transparent 85%),
+    linear-gradient(160deg, #4a3221 0%, var(--oak) 50%, var(--oak-shadow) 100%);
+}
+.table-felt {
+  background:
+    /* concentric subtle "felt weave" rings */
+    radial-gradient(ellipse 90% 70% at 50% 50%, rgba(255, 230, 180, 0.05), transparent 65%),
+    /* central oil-lamp pool of light */
+    radial-gradient(ellipse 38% 30% at 50% 50%, rgba(255, 200, 130, 0.10), transparent 70%),
+    /* dark inner rim shadow so the felt feels recessed inside the rail */
+    radial-gradient(ellipse 95% 80% at 50% 50%, transparent 50%, var(--felt-shade) 95%),
+    /* the felt color itself */
+    var(--felt-rich);
+}
+.brass-ring {
+  /* Brass hairline ring that sits between the rail and the felt. */
+  background: linear-gradient(180deg, #d6b07c 0%, #b89668 50%, #8b724e 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 230, 180, 0.35) inset,
+    0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.felt-stamp {
+  /* The manufacturer-mark wordmark stamped into the felt center. */
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  color: rgba(255, 230, 180, 0.085);
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  user-select: none;
+  pointer-events: none;
+}
+.felt-stamp-sub {
+  /* Tagline under the stamp, even quieter. */
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  letter-spacing: 0.5em;
+  color: rgba(255, 230, 180, 0.055);
+  text-transform: uppercase;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ── Hero (human) seat — parchment name plate, no avatar circle so it doesn't
+   collide with the action panel sitting directly below it. ───────────────── */
+.name-plate {
+  background:
+    radial-gradient(ellipse 120% 100% at 50% 0%, rgba(255, 245, 215, 0.6), transparent 60%),
+    var(--parchment);
+  color: var(--ink);
+  border: 1px solid rgba(184, 150, 104, 0.55);
+  box-shadow:
+    0 1px 0 rgba(255, 240, 200, 0.4) inset,
+    0 6px 14px -6px rgba(0, 0, 0, 0.7);
+  border-radius: 6px;
+}
+
+/* ── Action placard — wooden betting menu, brass-trimmed. ─────────────────── */
+.action-placard {
+  background:
+    radial-gradient(ellipse 100% 60% at 50% 0%, rgba(255, 200, 140, 0.05), transparent 70%),
+    linear-gradient(180deg, #2c1d12 0%, #1a1009 100%);
+  border: 1px solid rgba(184, 150, 104, 0.55);
+  box-shadow:
+    0 1px 0 rgba(255, 230, 180, 0.1) inset,
+    0 24px 38px -16px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  border-radius: 14px;
+}
+.action-placard::before,
+.action-placard::after {
+  /* Brass corner ornaments, just visible at the inside corners. */
+  content: "";
+  position: absolute;
+  width: 18px; height: 18px;
+  border-color: var(--brass);
+  border-style: solid;
+  pointer-events: none;
+}
+.action-placard::before {
+  top: 8px; left: 8px;
+  border-width: 1px 0 0 1px;
+}
+.action-placard::after {
+  bottom: 8px; right: 8px;
+  border-width: 0 1px 1px 0;
+}
+.bet-input {
+  background: var(--parchment);
+  color: var(--ink);
+  border: 1px solid rgba(184, 150, 104, 0.6);
+  box-shadow:
+    0 1px 0 rgba(255, 245, 215, 0.5) inset,
+    0 0 0 1px rgba(0, 0, 0, 0.2);
+  font-family: var(--font-bodoni), Georgia, serif;
+}
+.bet-input:focus-within {
+  border-color: var(--brass);
+  box-shadow:
+    0 1px 0 rgba(255, 245, 215, 0.5) inset,
+    0 0 0 2px rgba(184, 150, 104, 0.4);
+}
+.action-btn {
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid;
+  border-radius: 8px;
+  transition: transform 100ms ease, filter 120ms ease;
+}
+.action-btn:hover  { filter: brightness(1.08); }
+.action-btn:active { transform: scale(0.97); }
+.action-btn-fold   { background: #6e1620; color: var(--parchment); border-color: #4a0f17; }
+.action-btn-call   { background: #2a3f6e; color: var(--parchment); border-color: #18264a; }
+.action-btn-raise  { background: linear-gradient(180deg, #c9a468 0%, #8b6b3c 100%); color: var(--ink); border-color: #5a4423; }
+
+/* ─── Status placards — pressed-on labels for fold / out / all-in / away ───
+   Shared shape: small parchment rectangle, brass hairline border, Bodoni
+   italic copy. Ink color varies per status so each reads at a glance. */
+.status-placard {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 3px;
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  box-shadow:
+    0 1px 0 rgba(255, 245, 215, 0.35) inset,
+    0 6px 14px -6px rgba(0, 0, 0, 0.75),
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+  user-select: none;
+}
+.status-placard::before,
+.status-placard::after {
+  /* tiny corner notches — the "pinhole" on a real cardboard placard */
+  content: "";
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  flex: 0 0 auto;
+}
+.status-fold {
+  background:
+    radial-gradient(ellipse 130% 100% at 50% 0%, rgba(255, 245, 215, 0.6), transparent 65%),
+    var(--parchment);
+  color: var(--wine);
+  border: 1px solid rgba(138, 28, 42, 0.45);
+  transform: rotate(-7deg);
+}
+.status-out {
+  background: #2a221b;
+  color: #c9b893;
+  border: 1px solid rgba(184, 150, 104, 0.35);
+  transform: rotate(-3deg);
+  opacity: 0.85;
+}
+.status-allin {
+  background: linear-gradient(180deg, #d1a86d 0%, #8b6b3c 100%);
+  color: var(--ink);
+  border: 1px solid rgba(40, 26, 12, 0.55);
+  transform: rotate(-4deg);
+}
+.status-away {
+  background: rgba(13, 12, 10, 0.85);
+  color: var(--smoke);
+  border: 1px solid rgba(184, 150, 104, 0.3);
+}
+
+/* ─── Bet stack — chip stack rendered side-on next to the player. ─────────
+   Each chip is positioned absolutely with a vertical offset so you see the
+   side-stripe pattern (dashed border on Chip.tsx) like looking at the chips
+   across the felt. The value tag is a parchment plate next to the stack. */
+.bet-stack {
+  position: relative;
+  width: 32px;
+}
+.bet-stack > .chip-rung {
+  position: absolute;
+  left: 0;
+  /* bottom is set inline per-chip so we can stack any count without a class explosion */
+}
+.bet-tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background:
+    radial-gradient(ellipse 130% 100% at 50% 0%, rgba(255, 245, 215, 0.6), transparent 65%),
+    var(--parchment);
+  color: var(--ink);
+  border: 1px solid rgba(184, 150, 104, 0.55);
+  box-shadow:
+    0 1px 0 rgba(255, 240, 200, 0.4) inset,
+    0 6px 14px -6px rgba(0, 0, 0, 0.7);
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-weight: 700;
+}
+.bet-tag .bet-currency { color: var(--wine); font-size: 13px; }
+.bet-tag .bet-amount   { font-size: 15px; letter-spacing: 0.01em; }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Coach HUD — augmented-reality overlay on the table when the Coach is open.
+   Brass targeting brackets + parchment data callouts attach to live table
+   elements. Vibe: a Boston-law-library analyst's monocle, not Marvel cyan. */
+.hud-layer {
+  /* Wraps the entire overlay. Fades in/out, never blocks clicks (the
+     individual callouts can opt in to pointer-events). */
+  pointer-events: none;
+  transition: opacity 280ms ease;
+}
+.hud-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  /* Soft vignette so the table center stays brighter under the dim. */
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.6));
+}
+.hud-sweep {
+  /* Brass-tinted scan line that sweeps top → bottom once when the HUD opens. */
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 30%;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(184, 150, 104, 0.18) 30%,
+    rgba(236, 227, 205, 0.45) 50%,
+    rgba(184, 150, 104, 0.18) 70%,
+    transparent 100%
+  );
+  mix-blend-mode: screen;
+  animation: hud-sweep 0.75s ease-in-out 1 both;
+}
+@keyframes hud-sweep {
+  0%   { transform: translateY(-110%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(220%); opacity: 0; }
+}
+.hud-reticle {
+  /* Per-element container — sized to its callout. */
+  position: absolute;
+  display: inline-block;
+  animation: hud-fade-in 320ms ease-out both;
+}
+@keyframes hud-fade-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.92); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.hud-corner {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--brass);
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(184, 150, 104, 0.55);
+}
+.hud-corner-tl { top: -7px; left: -7px;   border-right: 0; border-bottom: 0; }
+.hud-corner-tr { top: -7px; right: -7px;  border-left: 0;  border-bottom: 0; }
+.hud-corner-bl { bottom: -7px; left: -7px;  border-right: 0; border-top: 0; }
+.hud-corner-br { bottom: -7px; right: -7px; border-left: 0;  border-top: 0; }
+.hud-callout {
+  background:
+    radial-gradient(ellipse 130% 100% at 50% 0%, rgba(255, 245, 215, 0.5), transparent 60%),
+    rgba(236, 227, 205, 0.92);
+  color: var(--ink);
+  border: 1px solid rgba(184, 150, 104, 0.55);
+  border-radius: 3px;
+  padding: 4px 10px;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 0 14px rgba(184, 150, 104, 0.3);
+  min-width: 64px;
+}
+.hud-label {
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass-soft);
+  line-height: 1;
+  margin-bottom: 2px;
+}
+.hud-data {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.05;
+  color: var(--ink);
+}
+.hud-sub {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--smoke);
+  margin-top: 2px;
+}
+
+/* ── Surveyor's pin — one per opponent, glanceable + clickable. ──────────── */
+.hud-pin {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 100% 80% at 50% 30%, rgba(255, 230, 180, 0.25), transparent 70%),
+    rgba(184, 150, 104, 0.16);
+  border: 1.5px solid var(--brass);
+  box-shadow:
+    0 0 12px rgba(184, 150, 104, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.5) inset;
+  color: var(--brass);
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  animation: hud-fade-in 320ms ease-out both;
+  user-select: none;
+}
+.hud-pin:hover,
+.hud-pin:focus-visible {
+  transform: translate(-50%, -50%) scale(1.18);
+  background:
+    radial-gradient(ellipse 100% 80% at 50% 30%, rgba(255, 240, 200, 0.4), transparent 70%),
+    rgba(184, 150, 104, 0.32);
+  box-shadow:
+    0 0 20px rgba(184, 150, 104, 0.7),
+    0 0 0 1px rgba(0, 0, 0, 0.5) inset;
+  outline: none;
+}
+.hud-pin.active {
+  background:
+    radial-gradient(ellipse 100% 80% at 50% 30%, rgba(255, 245, 215, 0.55), transparent 70%),
+    rgba(184, 150, 104, 0.42);
+  box-shadow:
+    0 0 22px rgba(184, 150, 104, 0.85),
+    0 0 0 1px rgba(0, 0, 0, 0.5) inset;
+  color: var(--parchment);
+}
+
+/* ── Dossier popup — opens from the pin toward the table center. ─────────── */
+.hud-dossier {
+  position: absolute;
+  min-width: 200px;
+  max-width: 240px;
+  background:
+    radial-gradient(ellipse 130% 100% at 50% 0%, rgba(255, 245, 215, 0.6), transparent 60%),
+    rgba(236, 227, 205, 0.95);
+  color: var(--ink);
+  border: 1px solid rgba(184, 150, 104, 0.6);
+  border-radius: 4px;
+  padding: 10px 12px 12px;
+  box-shadow:
+    0 12px 28px -8px rgba(0, 0, 0, 0.75),
+    0 0 24px rgba(184, 150, 104, 0.35);
+  pointer-events: auto;
+  animation: hud-fade-in 200ms ease-out both;
+  z-index: 5;
+}
+.hud-dossier-name {
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-style: italic;
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.hud-dossier-rule {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(184, 150, 104, 0.55) 50%, transparent);
+  margin: 6px 0 8px;
+}
+.hud-dossier-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 3px 0;
+}
+.hud-dossier-label {
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-style: italic;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass-soft);
+}
+.hud-dossier-value {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+.hud-dossier-blurb {
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-style: italic;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(13, 12, 10, 0.78);
+  margin-top: 8px;
+}
+.hud-dossier-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--brass-soft);
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+}
+.hud-dossier-close:hover { color: var(--ink); }
+
+/* ── Chat side-toggle button in the panel header. ───────────────────────── */
+.coach-side-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  background: rgba(184, 150, 104, 0.08);
+  border: 1px solid rgba(184, 150, 104, 0.35);
+  color: var(--brass);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 140ms ease, color 140ms ease;
+}
+.coach-side-toggle:hover {
+  background: rgba(184, 150, 104, 0.18);
+  color: var(--parchment);
+}
+
+/* Coach comm-panel — lives inside the AR overlay, not as a side drawer.
+   Translucent enough that the table reads through, framed with brass
+   corner brackets so it visually belongs to the HUD. */
+.coach-panel-hud {
+  background:
+    linear-gradient(180deg, rgba(20, 16, 12, 0.55) 0%, rgba(10, 8, 6, 0.55) 100%);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  border: 1px solid rgba(184, 150, 104, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 0 24px rgba(184, 150, 104, 0.18),
+    0 24px 60px -16px rgba(0, 0, 0, 0.8);
+}
+/* The brackets reuse the .hud-corner system from the reticles so the panel
+   and the table callouts look like the same instrument. Sized larger here
+   because the panel itself is much bigger than a callout. */
+.coach-panel-hud > .hud-corner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+.coach-panel-hud > .hud-corner-tl { top: -8px; left: -8px; }
+.coach-panel-hud > .hud-corner-tr { top: -8px; right: -8px; }
+.coach-panel-hud > .hud-corner-bl { bottom: -8px; left: -8px; }
+.coach-panel-hud > .hud-corner-br { bottom: -8px; right: -8px; }
+
+/* Translucent message bubbles so the table behind shows through. */
+.coach-bubble-user {
+  background: rgba(184, 150, 104, 0.92);
+  color: var(--ink);
+}
+.coach-bubble-assistant {
+  background: rgba(20, 16, 12, 0.65);
+  color: rgba(236, 227, 205, 0.95);
+  border: 1px solid rgba(184, 150, 104, 0.22);
+}
+
+/* Legacy class — kept so anything still referencing it keeps the old look. */
+.coach-translucent {
+  background-color: rgba(10, 10, 12, 0.78) !important;
+  backdrop-filter: blur(6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-sweep   { animation: none; opacity: 0; }
+  .hud-reticle { animation: none; }
+  .tier-card,
+  .tier-card:hover { transition: none; }
 }

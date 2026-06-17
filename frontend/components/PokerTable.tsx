@@ -6,13 +6,20 @@ import PlayerSeat from './PlayerSeat'
 import CommunityCards from './CommunityCards'
 import PotDisplay from './PotDisplay'
 import ActionPanel from './ActionPanel'
-import Chip, { chipColorFor } from './Chip'
+import Chip from './Chip'
+import BetStack from './BetStack'
 
 interface PokerTableProps {
   state: GameState
   onAction?: (action: ActionType, amount: number) => void
   dealtCount?: number
   isDealing?: boolean
+  /** Optional overlay rendered on top of the table region — used for the
+   *  Coach AR HUD. Shares the table's coordinate system. */
+  hudOverlay?: React.ReactNode
+  /** Chat panel rendered inside the table wrapper so it docks to the AR
+   *  area's right edge instead of the viewport's right edge. */
+  chatPanel?: React.ReactNode
 }
 
 // For seat `s`, when have we dealt them `1` card? After (s - SB) % n cards.
@@ -50,7 +57,9 @@ function WinnerChipFly({
   )
 }
 
-export default function PokerTable({ state, onAction, dealtCount = 0, isDealing = false }: PokerTableProps) {
+export default function PokerTable({
+  state, onAction, dealtCount = 0, isDealing = false, hudOverlay, chatPanel,
+}: PokerTableProps) {
   const n = state.players.length
   const isShowdown = state.phase === 'showdown'
 
@@ -79,18 +88,22 @@ export default function PokerTable({ state, onAction, dealtCount = 0, isDealing 
         </div>
       )}
       <div className="relative aspect-[16/7.4]">
-        {/* Outer rail */}
-        <div
-          className="absolute inset-0 rounded-[50%] shadow-2xl"
-          style={{ background: 'var(--felt-dark)' }}
-        />
+        {/* Outer rail — oak wood with grain. */}
+        <div className="table-rail absolute inset-0 rounded-[50%] shadow-2xl" />
 
-        {/* Inner felt */}
-        <div
-          className="absolute inset-6 rounded-[50%] shadow-inner overflow-visible"
-          style={{ background: 'var(--felt)' }}
-        >
-          {/* Center area: community cards + pot */}
+        {/* Brass hairline trim ring between rail and felt. */}
+        <div className="brass-ring absolute inset-5 rounded-[50%]" />
+
+        {/* Worn felt with center oil-lamp pool + dark recessed rim. */}
+        <div className="table-felt absolute inset-[22px] rounded-[50%] overflow-visible">
+          {/* Manufacturer-mark wordmark stamped into the felt, behind the
+              community cards. Quiet enough to feel printed-on, not added-on. */}
+          <div className="absolute top-[58%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+            <div className="felt-stamp text-3xl md:text-4xl">RiverIQ</div>
+            <div className="felt-stamp-sub text-[9px] mt-1">Texas Hold&apos;em</div>
+          </div>
+
+          {/* Center area: community cards + pot. */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-3">
             <CommunityCards cards={state.communityCards} />
             <PotDisplay amount={state.pot} />
@@ -142,18 +155,18 @@ export default function PokerTable({ state, onAction, dealtCount = 0, isDealing 
           )
         })}
 
-        {/* Bets — between each seat and the pot. */}
+        {/* Bets — a real chip stack between each seat and the pot. */}
         {state.players.map((player, i) => {
           if (player.currentBet <= 0) return null
           const angle = Math.PI / 2 + (i / n) * 2 * Math.PI
           let betX = 50 + 32 * Math.cos(angle)
           let betY = 50 + 28 * Math.sin(angle)
           if (player.isHuman) {
-            betX = 65
-            betY = 87
+            betX = 60
+            betY = 84
           } else if (i === Math.round(n / 2)) {
-            betX = 65
-            betY = 18
+            betX = 60
+            betY = 22
           }
           return (
             <div
@@ -165,12 +178,7 @@ export default function PokerTable({ state, onAction, dealtCount = 0, isDealing 
                 transform: 'translate(-50%, -50%)',
               }}
             >
-              <div className="flex items-center gap-1.5 bg-black/80 px-2.5 py-1 rounded-full shadow-lg border border-amber-500/40">
-                <Chip color={chipColorFor(player.currentBet)} size="sm" />
-                <span className="text-amber-300 text-sm font-bold whitespace-nowrap">
-                  ${player.currentBet}
-                </span>
-              </div>
+              <BetStack amount={player.currentBet} />
             </div>
           )
         })}
@@ -193,6 +201,14 @@ export default function PokerTable({ state, onAction, dealtCount = 0, isDealing 
             />
           ))
         })}
+
+        {/* Coach AR overlay — rendered on top of the table region so it
+            shares the same coordinate system as the seats. */}
+        {hudOverlay}
+
+        {/* Coach chat panel — docked to the right edge of the AR area so it
+            visually belongs to the HUD instead of floating in the viewport. */}
+        {chatPanel}
       </div>
 
       {/* Action panel below the human seat. Reserves vertical space so the

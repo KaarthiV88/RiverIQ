@@ -1,58 +1,107 @@
 import Link from 'next/link'
-import { DIFFICULTIES } from '../lib/difficulties'
+import { DIFFICULTIES, Difficulty } from '../lib/difficulties'
+
+// Suit + rank assignment for each tier. The ranking encodes the stakes
+// ladder (2 → 7 → J → A) and the suits encode the room's archetype:
+//   ♣ clubs    — recreational, working-class table
+//   ♦ diamonds — casual money game
+//   ♥ hearts   — mixed pool, sentimental veterans + sharks
+//   ♠ spades   — the killers; spades is the high suit
+type Suit = '♣' | '♦' | '♥' | '♠'
+const TIER_FACE: Record<Difficulty['id'], { rank: string; suit: Suit; tilt: 1 | 2 | 3 | 4 }> = {
+  'home-game': { rank: '2', suit: '♣', tilt: 1 },
+  'easy':      { rank: '7', suit: '♦', tilt: 2 },
+  'medium':    { rank: 'J', suit: '♥', tilt: 3 },
+  'hard':      { rank: 'A', suit: '♠', tilt: 4 },
+}
+
+function CornerIndex({
+  rank, suit, position,
+}: { rank: string; suit: Suit; position: 'top' | 'bottom' }) {
+  const isRed = suit === '♦' || suit === '♥'
+  return (
+    <span className={`corner-index ${position} ${isRed ? 'suit-red' : 'suit-black'}`}>
+      <span className="rank">{rank}</span>
+      <span className="suit">{suit}</span>
+    </span>
+  )
+}
+
+function TierCard({ diff }: { diff: Difficulty }) {
+  const face = TIER_FACE[diff.id]
+  return (
+    <Link
+      href={`/game?style=${diff.id}`}
+      aria-label={`Sit at the ${diff.name} table`}
+      className="tier-card group block focus:outline-none"
+      data-tilt={face.tilt}
+    >
+      <CornerIndex rank={face.rank} suit={face.suit} position="top" />
+      <CornerIndex rank={face.rank} suit={face.suit} position="bottom" />
+
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 py-8">
+        <h2 className="tier-title text-3xl md:text-4xl mb-1">{diff.name}</h2>
+        <p className="tier-tagline text-sm mb-5">{diff.tagline}</p>
+        <p className="tier-body text-sm leading-snug max-w-[22ch]">
+          {diff.description}
+        </p>
+        <div className="absolute bottom-8 left-0 right-0 px-12">
+          <p className="tier-footnote">Randomized lineup</p>
+        </div>
+      </div>
+    </Link>
+  )
+}
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-underground text-white flex flex-col items-center px-6 py-16">
-      <h1 className="text-7xl font-bold mb-3 tracking-tight">RiverIQ</h1>
-      <p className="text-lg mb-2 opacity-70 tracking-wide uppercase">
-        Texas Hold&apos;em AI Coaching
-      </p>
-      <p className="text-base mb-10 opacity-50">
-        Pick a table. You&apos;ll meet your opponents when you sit down.
-      </p>
+    <div className="min-h-screen bg-underground text-white flex flex-col px-6 pt-16 pb-10">
+      {/* Hero ─────────────────────────────────────────────────────────────── */}
+      <header className="text-center max-w-3xl mx-auto">
+        <p className="eyebrow mb-4">Texas Hold&apos;em · AI Coaching</p>
+        <h1
+          className="font-display text-6xl md:text-8xl tracking-tight leading-none"
+          style={{ color: 'var(--parchment)' }}
+        >
+          RiverIQ
+        </h1>
+        <div className="brass-rule w-40 mx-auto mt-5 mb-4" />
+        <p className="text-white/55 text-base italic">
+          A back-room game with a learned brain — eight bot archetypes,
+          a Monte Carlo equity engine, and a coach that reads your spot
+          in real time.
+        </p>
+      </header>
 
-      <div className="flex gap-2 mb-10">
+      {/* Tier cards ─────────────────────────────────────────────────────── */}
+      <section className="mt-16 max-w-6xl w-full mx-auto">
+        <div className="flex items-center justify-center gap-5 mb-10">
+          <span className="brass-rule w-24" />
+          <p className="eyebrow whitespace-nowrap">Open Games — Tonight</p>
+          <span className="brass-rule w-24" />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 px-2">
+          {DIFFICULTIES.map(d => <TierCard key={d.id} diff={d} />)}
+        </div>
+      </section>
+
+      {/* Utility row ─────────────────────────────────────────────────────── */}
+      <footer className="mt-16 flex justify-center gap-8 text-sm">
         <Link
           href="/stats"
-          className="text-sm font-bold px-4 py-2 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-white/10 transition"
+          className="text-white/55 hover:text-[color:var(--brass)] transition-colors"
         >
-          Your Stats
+          Your stats
         </Link>
+        <span className="text-white/20">·</span>
         <Link
           href="/history"
-          className="text-sm font-bold px-4 py-2 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-white/10 transition"
+          className="text-white/55 hover:text-[color:var(--brass)] transition-colors"
         >
-          Hand History
+          Hand history
         </Link>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 w-full max-w-7xl">
-        {DIFFICULTIES.map((diff) => (
-          <a
-            key={diff.id}
-            href={`/game?style=${diff.id}`}
-            className="group relative overflow-hidden rounded-2xl bg-zinc-900/70 border border-white/10 hover:border-amber-400/60 hover:shadow-[0_0_30px_rgba(251,191,36,0.25)] transition-all p-6 flex flex-col min-h-[260px]"
-          >
-            <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${diff.accent}`} />
-
-            <h2 className="text-2xl font-bold tracking-tight mt-2">{diff.name}</h2>
-            <p className="text-sm text-amber-300/80 italic mb-3">{diff.tagline}</p>
-            <p className="text-sm text-white/70 mb-5">{diff.description}</p>
-
-            <div className="mt-auto pt-4 border-t border-white/5">
-              <div className="text-xs uppercase tracking-wide text-white/40">
-                Table size &amp; lineup
-              </div>
-              <div className="text-sm text-white/60 mt-1">Randomized each session</div>
-            </div>
-
-            <div className="mt-5 text-amber-300 font-bold text-sm group-hover:translate-x-1 transition-transform">
-              Sit at the table →
-            </div>
-          </a>
-        ))}
-      </div>
+      </footer>
     </div>
   )
 }

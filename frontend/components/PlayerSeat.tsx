@@ -16,6 +16,49 @@ interface PlayerSeatProps {
   cardOrigin?: { x: number; y: number }    // pixel vector toward the table-center deck
 }
 
+// Shared brass-placard status indicator. Each variant has its own ink color
+// and slight tilt so it reads as a physical label pressed onto the seat,
+// not a generic toast.
+function StatusPlacard({ variant, children }: { variant: string; children: React.ReactNode }) {
+  return <span className={`status-placard ${variant}`}>{children}</span>
+}
+
+function StatusOverlay({ player }: { player: Player }) {
+  // Centered overlay for "out of this hand" states (fold / busted / sitting out).
+  if (player.status === 'folded') {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <StatusPlacard variant="status-fold">Folded</StatusPlacard>
+      </div>
+    )
+  }
+  if (player.status === 'busted') {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <StatusPlacard variant="status-out">Out</StatusPlacard>
+      </div>
+    )
+  }
+  if (player.status === 'sitting-out') {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <StatusPlacard variant="status-away">Away</StatusPlacard>
+      </div>
+    )
+  }
+  return null
+}
+
+function AllInBadge() {
+  // All-in stays as a corner badge (not centered) because the player is
+  // still in the hand and we want their cards / chip stack visible.
+  return (
+    <div className="absolute -top-2 -left-2 pointer-events-none">
+      <StatusPlacard variant="status-allin">All in</StatusPlacard>
+    </div>
+  )
+}
+
 export default function PlayerSeat({
   player,
   isCurrentPlayer,
@@ -27,15 +70,75 @@ export default function PlayerSeat({
   visibleCardCount,
   cardOrigin = { x: 0, y: 0 },
 }: PlayerSeatProps) {
-  const isFolded = player.status === 'folded'
+  const isOut = player.status === 'folded' || player.status === 'sitting-out' || player.status === 'busted'
   const isAllIn = player.status === 'all-in'
-  const isSittingOut = player.status === 'sitting-out'
-  const isBusted = player.status === 'busted'
-  const isOut = isFolded || isSittingOut || isBusted
   const revealCards = player.isHuman || showCards
-  // Out-of-hand players: cards are taken away.
   const cardsToShow = isOut ? [] : player.holeCards.slice(0, visibleCardCount)
 
+  // ── Hero seat ──────────────────────────────────────────────────────────────
+  // Plate ABOVE cards so the action placard below has clean room. No big
+  // circular avatar — the user is behind their cards, not next to them.
+  if (player.isHuman) {
+    return (
+      <div
+        className={`relative flex flex-col items-center gap-2 transition-all
+          ${isOut ? 'opacity-40' : ''}
+          ${isCurrentPlayer ? 'scale-105' : ''}
+        `}
+      >
+        <div className="name-plate px-3 py-1 flex items-baseline gap-2 whitespace-nowrap">
+          <span className="font-display italic font-bold text-sm" style={{ color: 'var(--ink)' }}>
+            You
+          </span>
+          <span className="font-mono text-sm font-bold" style={{ color: 'var(--ink)' }}>
+            ${player.chips.toLocaleString()}
+          </span>
+        </div>
+
+        <div
+          className={`relative rounded-lg ${
+            isWinner
+              ? 'winner-pulse'
+              : isCurrentPlayer
+              ? 'ring-2 ring-yellow-300 shadow-[0_0_22px_rgba(253,224,71,0.6)]'
+              : ''
+          }`}
+        >
+          {cardsToShow.length > 0 && (
+            <div className="flex gap-1">
+              {cardsToShow.map((c) => (
+                <div
+                  key={c}
+                  className="hole-card-deal"
+                  style={
+                    {
+                      '--card-from-x': `${cardOrigin.x}px`,
+                      '--card-from-y': `${cardOrigin.y}px`,
+                    } as CSSProperties
+                  }
+                >
+                  <Card card={revealCards ? c : null} size="lg" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {(isDealer || isLB || isBB) && (
+          <div className="absolute -top-2 -right-2 flex gap-1">
+            {isDealer && <PositionMarker marker="D" size="sm" />}
+            {isLB && <PositionMarker marker="LB" size="sm" />}
+            {isBB && <PositionMarker marker="BB" size="sm" />}
+          </div>
+        )}
+
+        {isAllIn && <AllInBadge />}
+        <StatusOverlay player={player} />
+      </div>
+    )
+  }
+
+  // ── Bot seat ──────────────────────────────────────────────────────────────
   return (
     <div
       className={`relative flex flex-col items-center gap-1 transition-all
@@ -43,7 +146,6 @@ export default function PlayerSeat({
         ${isCurrentPlayer ? 'scale-110' : ''}
       `}
     >
-      {/* Hole cards */}
       {cardsToShow.length > 0 && (
         <div className="flex gap-1">
           {cardsToShow.map((c) => (
@@ -63,7 +165,6 @@ export default function PlayerSeat({
         </div>
       )}
 
-      {/* Avatar — yellow glow on turn, gold pulse on win. */}
       <div
         className={`rounded-full ${
           isWinner
@@ -73,25 +174,22 @@ export default function PlayerSeat({
             : ''
         }`}
       >
-        <Avatar name={player.name} isHuman={player.isHuman} size="lg" />
+        <Avatar name={player.name} isHuman={false} size="lg" />
       </div>
 
-      {/* Name + chip count card. For the human seat we float it to the right
-          of the avatar so it doesn't push down into the action panel below. */}
       <div
-        className={`rounded-lg px-3 py-1.5 text-center min-w-[110px] shadow ${
-          isWinner ? 'bg-amber-600/80 ring-2 ring-amber-300' : 'bg-black/65'
-        } ${
-          player.isHuman
-            ? 'absolute left-full top-1/2 ml-3 -translate-y-1/2 whitespace-nowrap'
-            : ''
+        className={`name-plate px-3 py-1.5 text-center min-w-[110px] ${
+          isWinner ? 'ring-2 ring-amber-300' : ''
         }`}
       >
-        <div className="text-sm font-semibold text-white truncate">{player.name}</div>
-        <div className="text-base text-amber-300 font-bold">${player.chips}</div>
+        <div className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>
+          {player.name}
+        </div>
+        <div className="text-base font-bold font-mono" style={{ color: 'var(--wine)' }}>
+          ${player.chips.toLocaleString()}
+        </div>
       </div>
 
-      {/* Position markers */}
       {(isDealer || isLB || isBB) && (
         <div className="absolute -top-2 -right-2 flex gap-1">
           {isDealer && <PositionMarker marker="D" size="sm" />}
@@ -100,33 +198,8 @@ export default function PlayerSeat({
         </div>
       )}
 
-      {/* Status overlays */}
-      {isFolded && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-red-700 text-white text-xs font-bold px-2 py-0.5 rounded -rotate-12 shadow">
-            FOLD
-          </div>
-        </div>
-      )}
-      {isAllIn && (
-        <div className="absolute -top-2 -left-2 bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded shadow">
-          ALL-IN
-        </div>
-      )}
-      {isSittingOut && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-zinc-700 text-white text-xs font-bold px-2 py-0.5 rounded -rotate-12 shadow">
-            SITTING OUT
-          </div>
-        </div>
-      )}
-      {isBusted && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-zinc-900 text-rose-400 text-xs font-bold px-2 py-0.5 rounded -rotate-12 shadow border border-rose-500/40">
-            BUSTED
-          </div>
-        </div>
-      )}
+      {isAllIn && <AllInBadge />}
+      <StatusOverlay player={player} />
     </div>
   )
 }

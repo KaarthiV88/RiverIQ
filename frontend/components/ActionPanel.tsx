@@ -93,20 +93,29 @@ export default function ActionPanel({ state, onAction, disabled = false }: Actio
     onAction('raise', parsed)
   }
 
+  // Preset sizings = (call cost) + (pot-relative top-up). Cap each preset to
+  // the legal raise window so a preset never offers an illegal amount.
   const pot = Math.max(state.pot, 0)
-  const halfPot = state.currentBet + Math.floor(pot * 0.5)
   const presets = [
-    { label: '½ Pot', value: halfPot },
+    { label: '½ Pot', value: state.currentBet + Math.floor(pot * 0.5) },
+    { label: '¾ Pot', value: state.currentBet + Math.floor(pot * 0.75) },
+    { label: 'Pot',   value: state.currentBet + pot },
+    { label: 'All in', value: maxRaiseTotal },
   ].filter(p => p.value >= minRaiseTotal && p.value <= maxRaiseTotal)
 
   return (
-    <div className="flex flex-col items-stretch gap-4 bg-black/75 rounded-2xl p-6 min-w-[680px] border-2 border-amber-400 shadow-[0_0_28px_rgba(251,191,36,0.55)]">
+    <div className="action-placard relative flex flex-col items-stretch gap-4 p-6 min-w-[680px]">
       {canRaise && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-center gap-4">
-            <span className="text-sm text-white/60 font-mono">min ${minRaiseTotal}</span>
-            <div className="flex items-center gap-2 bg-zinc-950 border-2 border-amber-400/50 rounded-xl px-4 py-2 focus-within:border-amber-400">
-              <span className="text-amber-300 text-2xl font-bold">$</span>
+            <span
+              className="text-xs font-mono uppercase tracking-widest"
+              style={{ color: 'var(--brass-soft)' }}
+            >
+              min ${minRaiseTotal}
+            </span>
+            <div className="bet-input flex items-center gap-1 rounded-md px-4 py-2">
+              <span className="text-2xl font-bold" style={{ color: 'var(--wine)' }}>$</span>
               <input
                 type="number"
                 value={inputValue}
@@ -116,10 +125,16 @@ export default function ActionPanel({ state, onAction, disabled = false }: Actio
                 min={minRaiseTotal}
                 max={maxRaiseTotal}
                 step={5}
-                className="w-40 bg-transparent text-white text-3xl font-extrabold text-center focus:outline-none"
+                className="w-44 bg-transparent text-3xl font-extrabold text-center focus:outline-none"
+                style={{ color: 'var(--ink)' }}
               />
             </div>
-            <span className="text-sm text-white/60 font-mono">max ${maxRaiseTotal}</span>
+            <span
+              className="text-xs font-mono uppercase tracking-widest"
+              style={{ color: 'var(--brass-soft)' }}
+            >
+              max ${maxRaiseTotal}
+            </span>
           </div>
           {presets.length > 0 && (
             <div className="flex gap-2 justify-center">
@@ -127,7 +142,12 @@ export default function ActionPanel({ state, onAction, disabled = false }: Actio
                 <button
                   key={p.label}
                   onClick={() => setAmount(p.value)}
-                  className="text-sm px-4 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white/90 border border-white/10 transition font-semibold"
+                  className="text-xs font-mono uppercase tracking-wider px-3 py-1 rounded-md transition"
+                  style={{
+                    background: 'rgba(184, 150, 104, 0.08)',
+                    color: 'var(--brass)',
+                    border: '1px solid rgba(184, 150, 104, 0.35)',
+                  }}
                 >
                   {p.label}
                 </button>
@@ -140,7 +160,7 @@ export default function ActionPanel({ state, onAction, disabled = false }: Actio
       <div className="flex gap-3 justify-center">
         <button
           onClick={() => onAction('fold', 0)}
-          className="flex-1 px-6 py-4 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-lg rounded-xl shadow transition"
+          className="action-btn action-btn-fold flex-1 px-6 py-4 text-lg"
         >
           Fold
         </button>
@@ -148,14 +168,14 @@ export default function ActionPanel({ state, onAction, disabled = false }: Actio
         {canCheck ? (
           <button
             onClick={() => onAction('check', 0)}
-            className="flex-1 px-6 py-4 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-lg rounded-xl shadow transition"
+            className="action-btn action-btn-call flex-1 px-6 py-4 text-lg"
           >
             Check
           </button>
         ) : (
           <button
             onClick={() => onAction('call', callAmount)}
-            className="flex-1 px-6 py-4 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-bold text-lg rounded-xl shadow transition"
+            className="action-btn action-btn-call flex-1 px-6 py-4 text-lg"
           >
             Call ${callAmount}
           </button>
@@ -164,9 +184,9 @@ export default function ActionPanel({ state, onAction, disabled = false }: Actio
         {canRaise && (
           <button
             onClick={() => onAction('raise', raiseAmount)}
-            className="flex-1 px-6 py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-lg rounded-xl shadow transition"
+            className="action-btn action-btn-raise flex-1 px-6 py-4 text-lg"
           >
-            Raise → ${raiseAmount}
+            Raise to ${raiseAmount}
           </button>
         )}
       </div>

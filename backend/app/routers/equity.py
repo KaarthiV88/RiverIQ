@@ -56,6 +56,38 @@ def parse_cards(card_strings: list[str]) -> list[int]:
 
 
 
+class HeroEquityResponse(BaseModel):
+    equity: float
+
+
+@router.get("/hero", response_model=HeroEquityResponse)
+async def hero_equity_route(
+    hole: str,
+    board: str = "",
+    num_opps: int = 1,
+    sims: int = 1500,
+):
+    """Compute hero hand vs. N random opponents — used by the in-game coach
+    HUD where we need a quick equity readout without asking the LLM. Reuses
+    the cached Monte Carlo from coach.context."""
+    from app.coach.context import hero_equity
+
+    hole_cards = tuple(c.strip() for c in hole.split(",") if c.strip())
+    board_cards = tuple(c.strip() for c in board.split(",") if c.strip())
+    if len(hole_cards) != 2:
+        raise HTTPException(status_code=400, detail="hole must be two cards, comma-separated")
+    if not (1 <= num_opps <= 8):
+        raise HTTPException(status_code=400, detail="num_opps must be between 1 and 8")
+    if not (200 <= sims <= 5000):
+        raise HTTPException(status_code=400, detail="sims must be between 200 and 5000")
+
+    try:
+        eq = hero_equity(hole_cards, board_cards, num_opps, sims)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"Equity computation failed: {e}")
+    return HeroEquityResponse(equity=round(eq, 4))
+
+
 @router.post("/calculate", response_model=EquityResponse)
 async def calculate_equity(request: EquityRequest):
     player_cards = [parse_cards(hand) for hand in request.players]

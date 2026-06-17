@@ -6,6 +6,7 @@ import PokerTable from '../../components/PokerTable'
 import GameMenu from '../../components/GameMenu'
 import ConfirmModal from '../../components/ConfirmModal'
 import CoachPanel from '../../components/CoachPanel'
+import TableHUD from '../../components/TableHUD'
 import { GameState, ActionType } from '../../types/poker'
 import {
   initGame, dealNewHand, processAction, advanceStreet, STARTING_CHIPS,
@@ -36,6 +37,22 @@ function GamePageInner() {
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
   const [coachOpen, setCoachOpen] = useState(false)
   const [coachStreaming, setCoachStreaming] = useState(false)
+  // Which side of the AR area the chat docks to. Persisted across sessions
+  // so the user's preference sticks.
+  const [coachSide, setCoachSide] = useState<'left' | 'right'>('right')
+  useEffect(() => {
+    const saved = typeof window !== 'undefined'
+      ? (window.localStorage.getItem('riveriq:coach_side') as 'left' | 'right' | null)
+      : null
+    if (saved === 'left' || saved === 'right') setCoachSide(saved)
+  }, [])
+  const toggleCoachSide = useCallback(() => {
+    setCoachSide(prev => {
+      const next = prev === 'right' ? 'left' : 'right'
+      if (typeof window !== 'undefined') window.localStorage.setItem('riveriq:coach_side', next)
+      return next
+    })
+  }, [])
 
   // Hand-history persistence (Phase 6): track the hero's stack snapshot at the
   // start of each hand and persist a summary once the hand reaches showdown.
@@ -269,16 +286,31 @@ function GamePageInner() {
         onAction={handleAction}
         dealtCount={dealtCount}
         isDealing={isDealing}
+        hudOverlay={<TableHUD state={state} active={coachOpen} />}
+        chatPanel={
+          <CoachPanel
+            open={coachOpen}
+            onClose={() => setCoachOpen(false)}
+            gameState={state}
+            onStreamingChange={setCoachStreaming}
+            side={coachSide}
+            onToggleSide={toggleCoachSide}
+          />
+        }
       />
 
-      <GameMenu
-        isSittingOut={sitOutQueued}
-        canAddToStack={canAddToStack}
-        onStand={handleStand}
-        onAddToStack={requestAddToStack}
-        onReset={requestReset}
-        onLeave={requestLeave}
-      />
+      {/* Stand / Add to Stack / Reset / Leave — hidden while the Coach is
+          open so the AR area on the right has no competing UI on the edge. */}
+      {!coachOpen && (
+        <GameMenu
+          isSittingOut={sitOutQueued}
+          canAddToStack={canAddToStack}
+          onStand={handleStand}
+          onAddToStack={requestAddToStack}
+          onReset={requestReset}
+          onLeave={requestLeave}
+        />
+      )}
 
       {confirmKind === 'leave' && (
         <ConfirmModal
@@ -344,13 +376,6 @@ function GamePageInner() {
           {coachStreaming ? 'Coach is thinking…' : 'Ask Coach'}
         </button>
       )}
-
-      <CoachPanel
-        open={coachOpen}
-        onClose={() => setCoachOpen(false)}
-        gameState={state}
-        onStreamingChange={setCoachStreaming}
-      />
     </div>
   )
 }

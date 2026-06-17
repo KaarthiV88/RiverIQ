@@ -1,4 +1,4 @@
-import { BOT_AVATARS } from './avatars/BotAvatars'
+import { getBotAvatar } from './avatars/BotAvatars'
 
 interface AvatarProps {
   name: string
@@ -12,23 +12,6 @@ const SIZES = {
   lg: 'w-20 h-20 text-base',
 }
 
-const COLOR_POOL = [
-  'from-rose-500 to-rose-700',
-  'from-amber-500 to-orange-700',
-  'from-emerald-500 to-teal-700',
-  'from-sky-500 to-blue-700',
-  'from-indigo-500 to-purple-700',
-  'from-fuchsia-500 to-pink-700',
-  'from-lime-500 to-green-700',
-  'from-cyan-500 to-blue-600',
-]
-
-function hashName(name: string): number {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0
-  return Math.abs(h)
-}
-
 function getInitials(name: string): string {
   const cleaned = name.replace('.', '').trim()
   const parts = cleaned.split(/\s+/)
@@ -38,25 +21,32 @@ function getInitials(name: string): string {
 
 export default function Avatar({ name, isHuman = false, size = 'md' }: AvatarProps) {
   const sizeClass = SIZES[size]
-  const BotSvg = BOT_AVATARS[name]
+  const BotSvg = isHuman ? undefined : getBotAvatar(name)
 
-  // Known bot → render its custom SVG portrait inside a circular frame.
-  if (BotSvg && !isHuman) {
+  // Bot → either the hand-drawn portrait for named pros or a hash-assigned
+  // archetype (cowboy, visorman, suit, …). Either way: a real character,
+  // never initials.
+  if (BotSvg) {
     return (
-      <div className={`${sizeClass} rounded-full overflow-hidden ring-2 ring-white/30 shadow-lg`}>
+      <div
+        className={`${sizeClass} rounded-full overflow-hidden shadow-lg`}
+        style={{ boxShadow: '0 0 0 1px rgba(184,150,104,0.5), 0 6px 14px -6px rgba(0,0,0,0.8)' }}
+      >
         <BotSvg />
       </div>
     )
   }
 
-  // Human or unknown name → fallback to initials on a gradient.
-  const gradient = isHuman
-    ? 'from-yellow-400 to-amber-600'
-    : COLOR_POOL[hashName(name) % COLOR_POOL.length]
-
+  // Human only — kept as a brass-rimmed initial chip in case any consumer
+  // still asks for the human avatar (the in-game seat no longer does).
   return (
     <div
-      className={`${sizeClass} rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-white/30 select-none`}
+      className={`${sizeClass} rounded-full flex items-center justify-center font-bold select-none`}
+      style={{
+        background: 'linear-gradient(160deg, #c9a468 0%, #8b6b3c 100%)',
+        color: 'var(--ink)',
+        boxShadow: '0 0 0 1px rgba(184,150,104,0.6), 0 6px 14px -6px rgba(0,0,0,0.8)',
+      }}
     >
       {getInitials(name)}
     </div>
