@@ -96,6 +96,13 @@ export default function Landing() {
         </Link>
         <span className="text-white/20">·</span>
         <Link
+          href="/visualize"
+          className="text-white/55 hover:text-[color:var(--brass)] transition-colors"
+        >
+          The session
+        </Link>
+        <span className="text-white/20">·</span>
+        <Link
           href="/history"
           className="text-white/55 hover:text-[color:var(--brass)] transition-colors"
         >

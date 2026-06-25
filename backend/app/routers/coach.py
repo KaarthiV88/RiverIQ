@@ -16,7 +16,7 @@ coach's answers actually about the user's current spot.
 
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -24,21 +24,28 @@ from app.coach.context import GameContext
 from app.coach.llm_client import chat, stream_chat
 from app.coach.prompts import render_context_block, system_prompt_for
 from app.coach.session_context import get_user_leak_summary
+from app.limits import limiter
 
 router = APIRouter(prefix="/coach", tags=["coach"])
 
 
+# Cap one message body and the total conversation length so a single request
+# can't blow our token budget. 4 KB per message × 40 messages = ~160 KB max.
+MAX_MESSAGE_CHARS = 4000
+MAX_MESSAGES = 40
+
+
 class Message(BaseModel):
-    role: str = Field(..., description="'user' | 'assistant' | 'system'")
-    content: str
+    role: str = Field(..., max_length=16, description="'user' | 'assistant' | 'system'")
+    content: str = Field(..., max_length=MAX_MESSAGE_CHARS)
 
 
 class CoachChatRequest(BaseModel):
-    messages: list[Message]
+    messages: list[Message] = Field(..., max_length=MAX_MESSAGES)
     game_context: GameContext | None = None
     # Optional — if supplied, the backend pulls the user's recent leak
     # findings from Supabase and injects them as additional system context.
-    user_id: str | None = None
+    user_id: str | None = Field(default=None, max_length=64)
 
 
 class CoachChatResponse(BaseModel):
@@ -72,8 +79,9 @@ def _prepare_messages(
 
 
 @router.post("/chat", response_model=CoachChatResponse)
-async def coach_chat(request: CoachChatRequest) -> CoachChatResponse:
-    full_messages = _prepare_messages(request.messages, request.game_context, request.user_id)
+@limiter.limit("20/hour")
+async def coach_chat(request: Request, payload: CoachChatRequest) -> CoachChatResponse:
+    full_messages = _prepare_messages(payload.messages, payload.game_context, payload.user_id)
     try:
         reply = await chat(full_messages)
     except Exception as e:  # noqa: BLE001
@@ -82,8 +90,9 @@ async def coach_chat(request: CoachChatRequest) -> CoachChatResponse:
 
 
 @router.post("/chat/stream")
-async def coach_chat_stream(request: CoachChatRequest):
-    full_messages = _prepare_messages(request.messages, request.game_context, request.user_id)
+@limiter.limit("20/hour")
+async def coach_chat_stream(request: Request, payload: CoachChatRequest):
+    full_messages = _prepare_messages(payload.messages, payload.game_context, payload.user_id)
 
     async def event_stream():
         try:

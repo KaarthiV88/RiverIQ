@@ -12,6 +12,20 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
 
+    # Comma-separated list of allowed CORS origins. In dev this defaults to
+    # localhost:3000; in prod set CORS_ALLOW_ORIGINS to the deployed frontend
+    # URL (and any preview URLs you want to permit).
+    cors_allow_origins: str = "http://localhost:3000"
+
+    # Hard ceiling on stored hands per anonymous user. Beyond this the
+    # /history/hand POST returns 409 to stop a single user from pumping the
+    # table. Picked large enough that a realistic player will never hit it.
+    max_hands_per_user: int = 5000
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_allow_origins.split(",") if o.strip()]
+
 
 settings = Settings()
 

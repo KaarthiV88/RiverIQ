@@ -138,3 +138,12 @@ export async function listHands(userId: string, limit = 50): Promise<StoredHand[
   if (!res.ok) throw new Error(`listHands failed: ${res.status}`)
   return res.json()
 }
+
+export async function deleteHands(userId: string): Promise<number> {
+  const url = new URL(`${API_BASE}/history/hands`)
+  url.searchParams.set('user_id', userId)
+  const res = await fetch(url.toString(), { method: 'DELETE' })
+  if (!res.ok) throw new Error(`deleteHands failed: ${res.status}`)
+  const body = await res.json() as { deleted?: number }
+  return body.deleted ?? 0
+}

@@ -16,6 +16,7 @@ import { decideBotApi } from '../../lib/api'
 import { generateOpponents, getDifficulty, randomTableSize } from '../../lib/difficulties'
 import { getUserId } from '../../lib/userId'
 import { buildHandSummary, saveHand } from '../../lib/history'
+import { isMuted, playAction, playPot, playYourTurn, toggleMute } from '../../lib/sound'
 
 const BOT_DELAY_MS = 1500
 const SHOWDOWN_DELAY_MS = 4000
@@ -113,6 +114,61 @@ function GamePageInner() {
   }, [state, styleId])
 
   const isDealing = !!state && dealtCount < (state.players.length * 2)
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Audio cues. Synthesised on demand via lib/sound — no asset files.
+  //   - handHistory grows  → play that action's sound
+  //   - human's turn opens → soft brass bell
+  //   - phase → showdown   → pot-rake chip cascade
+  // Each ref tracks the previously observed state so transitions only
+  // trigger once. When a new hand begins, handHistory resets to 0 and we
+  // sync the ref without playing anything for the implicit blinds entries.
+  const lastHistoryLenRef = useRef(0)
+  const wasHumanTurnRef = useRef(false)
+  const lastPhaseRef = useRef<GameState['phase'] | null>(null)
+  const [, setMuteVersion] = useState(0)   // force re-render after toggle
+
+  useEffect(() => {
+    if (!state) return
+    const len = state.handHistory.length
+    const prev = lastHistoryLenRef.current
+    if (len < prev) {
+      // New hand was dealt — handHistory got rebuilt. Sync silently.
+      lastHistoryLenRef.current = len
+      return
+    }
+    if (len > prev) {
+      for (let i = prev; i < len; i++) {
+        playAction(state.handHistory[i].action)
+      }
+      lastHistoryLenRef.current = len
+    }
+  }, [state])
+
+  useEffect(() => {
+    if (!state) return
+    const current = state.players[state.currentPlayerIndex]
+    const myTurn =
+      state.phase === 'playing' &&
+      !isDealing &&
+      !!current?.isHuman &&
+      current.status === 'active'
+    if (myTurn && !wasHumanTurnRef.current) playYourTurn()
+    wasHumanTurnRef.current = myTurn
+  }, [state, isDealing])
+
+  useEffect(() => {
+    if (!state) return
+    if (state.phase === 'showdown' && lastPhaseRef.current !== 'showdown') {
+      playPot()
+    }
+    lastPhaseRef.current = state.phase
+  }, [state])
+
+  const handleToggleMute = useCallback(() => {
+    toggleMute()
+    setMuteVersion(v => v + 1)
+  }, [])
 
   // Step the dealing animation forward one card at a time. Sat-out and
   // busted seats just render empty card slots (their holeCards = []).
@@ -262,10 +318,32 @@ function GamePageInner() {
 
   return (
     <div className="min-h-screen bg-underground py-6 px-4 text-white">
-      <div className="fixed top-4 left-4 z-40 bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border border-white/15 shadow-lg">
-        <div className="text-xs uppercase tracking-wider text-white/50">Table</div>
-        <div className="text-base font-bold text-amber-300">{difficulty.name}</div>
-        <div className="text-xs text-white/50 mt-0.5">{state.players.length}-handed</div>
+      <div className="fixed top-4 left-4 z-40 bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border border-white/15 shadow-lg flex items-center gap-3">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-white/50">Table</div>
+          <div className="text-base font-bold text-amber-300">{difficulty.name}</div>
+          <div className="text-xs text-white/50 mt-0.5">{state.players.length}-handed</div>
+        </div>
+        <button
+          type="button"
+          onClick={handleToggleMute}
+          className="w-9 h-9 rounded-md border border-white/15 text-white/75 hover:text-white hover:bg-white/10 transition flex items-center justify-center"
+          aria-label={isMuted() ? 'Unmute sounds' : 'Mute sounds'}
+          title={isMuted() ? 'Unmute sounds' : 'Mute sounds'}
+        >
+          {isMuted() ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+            </svg>
+          )}
+        </button>
       </div>
 
       {/* Queued sit-out / sit-in banner — visible when the user's intent for

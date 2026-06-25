@@ -754,9 +754,157 @@ body {
   backdrop-filter: blur(6px);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Visualize page — parchment ledger cards for the session charts.
+   Cards read as hand-stitched ledger sheets pinned to a wall: warm parchment,
+   brass corner brackets, faint felt-green ruling under the data.
+   ──────────────────────────────────────────────────────────────────────────── */
+.ledger-card {
+  position: relative;
+  background:
+    radial-gradient(ellipse at top left, rgba(255, 246, 220, 0.85), transparent 60%),
+    radial-gradient(ellipse at bottom right, rgba(217, 207, 179, 0.6), transparent 60%),
+    var(--parchment);
+  color: var(--ink);
+  border: 1px solid rgba(184, 150, 104, 0.35);
+  border-radius: 10px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 24px 50px -28px rgba(0, 0, 0, 0.55),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+}
+.ledger-card::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(184, 150, 104, 0.18);
+  border-radius: 6px;
+  pointer-events: none;
+}
+.ledger-eyebrow {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--brass-soft);
+}
+.ledger-title {
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.ledger-figure {
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.ledger-sub {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--smoke);
+}
+.ledger-axis {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10px;
+  fill: var(--smoke);
+  letter-spacing: 0.08em;
+}
+.ledger-grid-line   { stroke: rgba(59, 74, 43, 0.18); stroke-width: 1; }
+.ledger-axis-line   { stroke: rgba(13, 12, 10, 0.35); stroke-width: 1; }
+.ledger-zero-line   { stroke: rgba(13, 12, 10, 0.55); stroke-width: 1; stroke-dasharray: 3 3; }
+.ledger-curve {
+  fill: none;
+  stroke: var(--brass);
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 0 rgba(255, 246, 220, 0.6));
+}
+.ledger-area-pos { fill: rgba(59, 74, 43, 0.20); }
+.ledger-area-neg { fill: rgba(138, 28, 42, 0.20); }
+.ledger-marker {
+  fill: var(--brass);
+  stroke: var(--ink);
+  stroke-width: 1;
+  filter: drop-shadow(0 0 10px rgba(184, 150, 104, 0.65));
+}
+@keyframes ledger-marker-pulse {
+  0%, 100% { transform: scale(1);   opacity: 0.55; }
+  50%      { transform: scale(2.4); opacity: 0;    }
+}
+.ledger-marker-halo {
+  fill: var(--brass);
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: ledger-marker-pulse 2.4s ease-out infinite;
+}
+.ledger-bar       { fill: var(--moss); }
+.ledger-bar-neg   { fill: var(--wine); }
+.ledger-bar-neutral { fill: rgba(13, 12, 10, 0.25); }
+.ledger-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(184, 150, 104, 0.45) 50%, transparent);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ExpandableCard — every dashboard tile zooms up to a centered fullscreen
+   modal. Click anywhere on the card to expand; click backdrop or hit Esc to
+   close. The trigger is a button so the affordance is keyboard-reachable.
+   ──────────────────────────────────────────────────────────────────────────── */
+.expandable-card {
+  cursor: pointer;
+  transition: transform 180ms ease-out, filter 180ms ease-out;
+  border-radius: 12px;
+  /* Strip the user-agent <button> chrome so the inner ledger-card reads. */
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  display: block;
+}
+.expandable-card:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+.expandable-card:active { transform: translateY(0) scale(0.992); }
+.expandable-card:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 4px;
+}
+
+@keyframes expand-overlay-in {
+  from { background-color: rgba(0, 0, 0, 0);   backdrop-filter: blur(0); }
+  to   { background-color: rgba(0, 0, 0, 0.78); backdrop-filter: blur(6px); }
+}
+@keyframes expand-content-in {
+  0%   { opacity: 0; transform: scale(0.35); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.expand-overlay {
+  background-color: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(6px);
+  animation: expand-overlay-in 240ms ease-out both;
+}
+.expand-content {
+  transform-origin: center center;
+  animation: expand-content-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hud-sweep   { animation: none; opacity: 0; }
   .hud-reticle { animation: none; }
   .tier-card,
   .tier-card:hover { transition: none; }
+  .ledger-marker-halo { animation: none; opacity: 0; }
+  .expandable-card { transition: none; }
+  .expandable-card:hover { transform: none; }
+  .expand-overlay,
+  .expand-content { animation: none; }
 }

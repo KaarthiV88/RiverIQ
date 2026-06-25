@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { GameState } from '../types/poker'
 import {
   CoachMessage,
@@ -52,7 +52,29 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
 
   const abortRef = useRef<AbortController | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
   const prevPhaseRef = useRef<GameState['phase']>(gameState.phase)
+  // Pixel-positioned `left` so we can transition between docked sides instead
+  // of snapping (Tailwind's right-3 / left-3 swap is `auto`-keyed and won't
+  // animate). Re-measured on side-change and on parent resize.
+  const [leftPx, setLeftPx] = useState<number | null>(null)
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current
+    const parent = panel?.parentElement
+    if (!panel || !parent) return
+    const GAP = 12 // matches the old `right-3` / `left-3` spacing
+    const update = () => {
+      const pw = parent.getBoundingClientRect().width
+      const w = panel.getBoundingClientRect().width
+      setLeftPx(side === 'right' ? pw - w - GAP : GAP)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(parent)
+    ro.observe(panel)
+    return () => ro.disconnect()
+  }, [side])
 
   const isReview = gameState.phase === 'showdown'
   const quickActions = isReview ? REVIEW_ACTIONS : LIVE_ACTIONS
@@ -159,13 +181,26 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
   return (
     <>
       <aside
-        className={`coach-panel-hud absolute top-3 bottom-3 z-30 w-[34%] max-w-[420px] min-w-[320px] rounded-md flex flex-col transition-all duration-300 ${
-          side === 'right' ? 'right-3' : 'left-3'
-        } ${
+        ref={panelRef}
+        className={`coach-panel-hud absolute top-3 bottom-3 z-30 w-[34%] max-w-[420px] min-w-[320px] rounded-md flex flex-col origin-center ${
           open
-            ? 'opacity-100 translate-x-0 pointer-events-auto'
-            : `opacity-0 pointer-events-none ${side === 'right' ? 'translate-x-4' : '-translate-x-4'}`
+            ? 'opacity-100 scale-100 pointer-events-auto'
+            : 'opacity-0 scale-50 pointer-events-none'
         }`}
+        style={{
+          // Hold off rendering at any position until we've measured the parent.
+          // Avoids a flash at top-left on first paint.
+          left: leftPx == null ? undefined : `${leftPx}px`,
+          right: 'auto',
+          // Three concurrent transitions:
+          //   left      — slide between docked sides
+          //   transform — scale-out from center on close/open
+          //   opacity   — fade
+          transition:
+            'left 520ms cubic-bezier(0.65, 0, 0.35, 1), ' +
+            'transform 340ms cubic-bezier(0.34, 1.56, 0.64, 1), ' +
+            'opacity 260ms ease-out',
+        }}
       >
         {/* Brass corner brackets — same vocabulary as the table reticles so
             the panel reads as part of the same HUD instrument. */}
@@ -215,13 +250,13 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
 
         <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
           {entries.length === 0 && (
-            <div className="text-white/50 text-sm leading-relaxed">
+            <div className="text-white/55 text-base leading-relaxed">
               <p className="mb-3">
                 {isReview
                   ? "The hand's over — ask me to review it, or anything else about the spot."
                   : "Ask anything about your current spot. I can see your hand, the board, the action history, and your opponents' styles."}
               </p>
-              <p className="text-white/40 text-xs">Quick start — try a chip below.</p>
+              <p className="text-white/45 text-sm">Quick start — try a chip below.</p>
             </div>
           )}
 
@@ -241,14 +276,14 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
                 className={`flex ${e.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                  className={`max-w-[88%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap ${
                     e.role === 'user'
                       ? 'coach-bubble-user font-medium rounded-br-sm'
                       : 'coach-bubble-assistant rounded-bl-sm'
                   }`}
                 >
                   {e.content || (streaming && i === entries.length - 1 ? (
-                    <span className="inline-flex gap-1 items-center text-white/50 text-xs">
+                    <span className="inline-flex gap-1 items-center text-white/55 text-sm">
                       <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-pulse" />
                       thinking
                     </span>
@@ -278,7 +313,7 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
                 key={q.label}
                 disabled={streaming}
                 onClick={() => send(q.prompt)}
-                className="text-xs px-3 py-1 rounded-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-white/85 border border-white/10 transition"
+                className="text-sm px-3 py-1.5 rounded-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-white/85 border border-white/10 transition"
               >
                 {q.label}
               </button>
@@ -292,12 +327,12 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask the coach…"
               disabled={streaming}
-              className="flex-1 bg-zinc-900 border border-white/15 rounded-lg px-3 py-2 text-white text-sm placeholder:text-white/35 focus:outline-none focus:border-amber-400 disabled:opacity-50"
+              className="flex-1 bg-zinc-900 border border-white/15 rounded-lg px-3 py-2.5 text-white text-base placeholder:text-white/35 focus:outline-none focus:border-amber-400 disabled:opacity-50"
             />
             <button
               type="submit"
               disabled={streaming || !input.trim()}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-white/30 active:scale-95 text-black font-bold rounded-lg text-sm transition"
+              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-white/30 active:scale-95 text-black font-bold rounded-lg text-base transition"
             >
               Send
             </button>
