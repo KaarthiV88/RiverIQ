@@ -8,9 +8,11 @@ fastapi-cors
 scikit-learn
 numpy
 pandas
+# CPU-only torch — the app only runs inference on a small policy net, so the
+# multi-GB CUDA build is wasted weight (and can blow Railway's build limits).
+# torchvision/torchaudio were never imported anywhere; dropped entirely.
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch
-torchvision
-torchaudio
 groq
 supabase
 slowapi
