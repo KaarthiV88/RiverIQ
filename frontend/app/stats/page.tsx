@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Finding, Stats, fetchLeaks, fetchStats } from '../../lib/stats'
 import { deleteHands } from '../../lib/history'
-import { getUserId } from '../../lib/userId'
 import ExpandableCard from '../../components/ExpandableCard'
+import SignInGate from '../../components/SignInGate'
 
 function fmtPct(v: number | null | undefined): string {
   return v == null ? '—' : `${(v * 100).toFixed(1)}%`
@@ -101,7 +101,7 @@ function SummaryTile({
   )
 }
 
-export default function StatsPage() {
+function StatsPageInner() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [leaks, setLeaks] = useState<Finding[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -109,9 +109,7 @@ export default function StatsPage() {
   const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
-    const uid = getUserId()
-    if (!uid) return
-    Promise.all([fetchStats(uid), fetchLeaks(uid)])
+    Promise.all([fetchStats(), fetchLeaks()])
       .then(([s, l]) => { setStats(s); setLeaks(l) })
       .catch(err => setError(err.message ?? String(err)))
   }, [])
@@ -119,12 +117,10 @@ export default function StatsPage() {
   const hasData = stats !== null && stats.hands_played > 0
 
   const handleReset = async () => {
-    const uid = getUserId()
-    if (!uid) return
     setResetting(true)
     try {
-      await deleteHands(uid)
-      const [s, l] = await Promise.all([fetchStats(uid), fetchLeaks(uid)])
+      await deleteHands()
+      const [s, l] = await Promise.all([fetchStats(), fetchLeaks()])
       setStats(s)
       setLeaks(l)
       setConfirmReset(false)
@@ -291,4 +287,8 @@ export default function StatsPage() {
       </div>
     </div>
   )
+}
+
+export default function StatsPage() {
+  return <SignInGate><StatsPageInner /></SignInGate>
 }

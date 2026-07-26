@@ -6,6 +6,7 @@
  */
 
 import { GameState, Player, PlayerAction } from '../types/poker'
+import { authFetch } from './authFetch'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
 
@@ -25,7 +26,10 @@ export interface ActionEntry {
 }
 
 export interface HandSummaryPayload {
-  user_id: string
+  // user_id is no longer client-controlled; the backend reads it from the
+  // verified JWT. Kept optional here so the type still matches the legacy
+  // schema for anyone reading old logs.
+  user_id?: string
   difficulty: string
   table_size: number
   position: string
@@ -70,7 +74,6 @@ function streetFromBoard(n: number): HandSummaryPayload['street_reached'] {
 
 export function buildHandSummary(
   state: GameState,
-  userId: string,
   difficulty: string,
   startingChips: number,
 ): HandSummaryPayload | null {
@@ -99,7 +102,6 @@ export function buildHandSummary(
     .map(id => state.players.find(p => p.id === id)?.name ?? id)
 
   return {
-    user_id: userId,
     difficulty,
     table_size: state.players.length,
     position: human.position,
@@ -120,7 +122,7 @@ export function buildHandSummary(
 }
 
 export async function saveHand(payload: HandSummaryPayload): Promise<void> {
-  const res = await fetch(`${API_BASE}/history/hand`, {
+  const res = await authFetch(`${API_BASE}/history/hand`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -130,20 +132,31 @@ export async function saveHand(payload: HandSummaryPayload): Promise<void> {
   }
 }
 
-export async function listHands(userId: string, limit = 50): Promise<StoredHand[]> {
+export async function listHands(limit = 50): Promise<StoredHand[]> {
   const url = new URL(`${API_BASE}/history/hands`)
-  url.searchParams.set('user_id', userId)
   url.searchParams.set('limit', String(limit))
-  const res = await fetch(url.toString())
+  const res = await authFetch(url.toString())
   if (!res.ok) throw new Error(`listHands failed: ${res.status}`)
   return res.json()
 }
 
-export async function deleteHands(userId: string): Promise<number> {
-  const url = new URL(`${API_BASE}/history/hands`)
-  url.searchParams.set('user_id', userId)
-  const res = await fetch(url.toString(), { method: 'DELETE' })
+export async function deleteHands(): Promise<number> {
+  const res = await authFetch(`${API_BASE}/history/hands`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`deleteHands failed: ${res.status}`)
   const body = await res.json() as { deleted?: number }
   return body.deleted ?? 0
+}
+
+/** Re-key any rows owned by the user's pre-auth anonymous UUID over to the
+ *  authenticated account. Called once on first sign-in. Returns the number
+ *  of rows that moved. */
+export async function claimLegacyHands(legacyUserId: string): Promise<number> {
+  const res = await authFetch(`${API_BASE}/history/claim`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ legacy_user_id: legacyUserId }),
+  })
+  if (!res.ok) throw new Error(`claim failed: ${res.status}`)
+  const body = await res.json() as { claimed?: number }
+  return body.claimed ?? 0
 }

@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { StoredHand, deleteHands, listHands } from '../../lib/history'
-import { getUserId } from '../../lib/userId'
 import Card from '../../components/Card'
+import SignInGate from '../../components/SignInGate'
 import { Card as CardType } from '../../types/poker'
 
 function PrettyTime({ iso }: { iso: string }) {
@@ -40,26 +40,22 @@ function ResultBadge({ result }: { result: number }) {
   )
 }
 
-export default function HistoryPage() {
+function HistoryPageInner() {
   const [hands, setHands] = useState<StoredHand[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
   const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
-    const uid = getUserId()
-    if (!uid) return
-    listHands(uid, 100)
+    listHands(100)
       .then(setHands)
       .catch(err => setError(err.message ?? String(err)))
   }, [])
 
   const handleReset = async () => {
-    const uid = getUserId()
-    if (!uid) return
     setResetting(true)
     try {
-      await deleteHands(uid)
+      await deleteHands()
       setHands([])
       setConfirmReset(false)
     } catch (err) {
@@ -212,4 +208,8 @@ export default function HistoryPage() {
       </div>
     </div>
   )
+}
+
+export default function HistoryPage() {
+  return <SignInGate><HistoryPageInner /></SignInGate>
 }

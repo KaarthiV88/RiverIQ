@@ -14,8 +14,8 @@ import {
 import { decideBotAction } from '../../lib/botLogic'
 import { decideBotApi } from '../../lib/api'
 import { generateOpponents, getDifficulty, randomTableSize } from '../../lib/difficulties'
-import { getUserId } from '../../lib/userId'
 import { buildHandSummary, saveHand } from '../../lib/history'
+import SignInGate from '../../components/SignInGate'
 import { isMuted, playAction, playPot, playYourTurn, toggleMute } from '../../lib/sound'
 
 const BOT_DELAY_MS = 1500
@@ -96,13 +96,11 @@ function GamePageInner() {
   useEffect(() => {
     if (!state || state.phase !== 'showdown') return
     if (savedHandRef.current) return
-    const userId = getUserId()
-    if (!userId) return
     const starting = handStartChipsRef.current
     if (starting === null) return
 
     savedHandRef.current = true
-    const payload = buildHandSummary(state, userId, styleId, starting)
+    const payload = buildHandSummary(state, styleId, starting)
     if (!payload) return
 
     saveHand(payload).catch(err => {
@@ -460,14 +458,16 @@ function GamePageInner() {
 
 export default function GamePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-underground flex items-center justify-center text-white">
-          <div className="text-2xl font-semibold opacity-70">Loading...</div>
-        </div>
-      }
-    >
-      <GamePageInner />
-    </Suspense>
+    <SignInGate>
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-underground flex items-center justify-center text-white">
+            <div className="text-2xl font-semibold opacity-70">Loading...</div>
+          </div>
+        }
+      >
+        <GamePageInner />
+      </Suspense>
+    </SignInGate>
   )
 }

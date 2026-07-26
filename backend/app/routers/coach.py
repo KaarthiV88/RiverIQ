@@ -16,10 +16,11 @@ coach's answers actually about the user's current spot.
 
 import json
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.auth import current_user
 from app.coach.context import GameContext
 from app.coach.llm_client import chat, stream_chat
 from app.coach.prompts import render_context_block, system_prompt_for
@@ -43,9 +44,10 @@ class Message(BaseModel):
 class CoachChatRequest(BaseModel):
     messages: list[Message] = Field(..., max_length=MAX_MESSAGES)
     game_context: GameContext | None = None
-    # Optional — if supplied, the backend pulls the user's recent leak
-    # findings from Supabase and injects them as additional system context.
-    user_id: str | None = Field(default=None, max_length=64)
+    # The backend pulls the user's recent leak findings from Supabase keyed
+    # on the verified JWT subject — the client can't override it anymore.
+    # Field kept for backwards-compatible payloads but ignored.
+    user_id: str | None = Field(default=None, max_length=64, deprecated=True)
 
 
 class CoachChatResponse(BaseModel):
@@ -80,8 +82,12 @@ def _prepare_messages(
 
 @router.post("/chat", response_model=CoachChatResponse)
 @limiter.limit("20/hour")
-async def coach_chat(request: Request, payload: CoachChatRequest) -> CoachChatResponse:
-    full_messages = _prepare_messages(payload.messages, payload.game_context, payload.user_id)
+async def coach_chat(
+    request: Request,
+    payload: CoachChatRequest,
+    user_id: str = Depends(current_user),
+) -> CoachChatResponse:
+    full_messages = _prepare_messages(payload.messages, payload.game_context, user_id)
     try:
         reply = await chat(full_messages)
     except Exception as e:  # noqa: BLE001
@@ -91,8 +97,12 @@ async def coach_chat(request: Request, payload: CoachChatRequest) -> CoachChatRe
 
 @router.post("/chat/stream")
 @limiter.limit("20/hour")
-async def coach_chat_stream(request: Request, payload: CoachChatRequest):
-    full_messages = _prepare_messages(payload.messages, payload.game_context, payload.user_id)
+async def coach_chat_stream(
+    request: Request,
+    payload: CoachChatRequest,
+    user_id: str = Depends(current_user),
+):
+    full_messages = _prepare_messages(payload.messages, payload.game_context, user_id)
 
     async def event_stream():
         try:

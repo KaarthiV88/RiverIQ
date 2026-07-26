@@ -15,6 +15,7 @@ env/
 dist/
 build/
 .pytest_cache/
+/unimportant/
 
 # Node
 node_modules/

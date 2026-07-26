@@ -1,5 +1,7 @@
 /** Stats + leak API client. */
 
+import { authFetch } from './authFetch'
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
 
 export interface PositionStats {
@@ -38,20 +40,18 @@ export interface Finding {
   explanation: string
 }
 
-export async function fetchStats(userId: string, limit = 200): Promise<Stats> {
+export async function fetchStats(limit = 200): Promise<Stats> {
   const url = new URL(`${API_BASE}/history/stats`)
-  url.searchParams.set('user_id', userId)
   url.searchParams.set('limit', String(limit))
-  const res = await fetch(url.toString())
+  const res = await authFetch(url.toString())
   if (!res.ok) throw new Error(`stats failed: ${res.status}`)
   return res.json()
 }
 
-export async function fetchLeaks(userId: string, limit = 200): Promise<Finding[]> {
+export async function fetchLeaks(limit = 200): Promise<Finding[]> {
   const url = new URL(`${API_BASE}/history/leaks`)
-  url.searchParams.set('user_id', userId)
   url.searchParams.set('limit', String(limit))
-  const res = await fetch(url.toString())
+  const res = await authFetch(url.toString())
   if (!res.ok) throw new Error(`leaks failed: ${res.status}`)
   return res.json()
 }

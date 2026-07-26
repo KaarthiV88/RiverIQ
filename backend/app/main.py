@@ -9,6 +9,7 @@ from starlette.responses import JSONResponse, Response
 
 from app.bots import orchestrator
 from app.config import settings
+from app.history.supabase_client import try_get_client
 from app.limits import limiter
 from app.routers import bot, coach, equity, history
 
@@ -80,6 +81,26 @@ app.include_router(coach.router)
 app.include_router(history.router)
 
 
+# Defined as a plain `def` (not `async`) so FastAPI runs it in a threadpool.
+# The supabase-py client is synchronous; awaiting it inside an async handler
+# would block the event loop on a network round-trip.
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+def health():
+    """Liveness + a real Supabase touch.
+
+    The touch is what makes the keepalive cron count as activity: a trivial
+    SELECT executes in Postgres and resets the free-tier idle timer. If
+    Supabase isn't configured we still report ok (nothing to keep alive);
+    if it's configured but unreachable we report 503 so a monitor can alert.
+    """
+    client = try_get_client()
+    if client is None:
+        return {"status": "ok", "supabase": "not_configured"}
+    try:
+        client.table("hands").select("id").limit(1).execute()
+    except Exception as exc:  # noqa: BLE001 — health must never raise
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "supabase": "unreachable", "detail": str(exc)},
+        )
+    return {"status": "ok", "supabase": "reachable"}

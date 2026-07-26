@@ -1,0 +1,30 @@
+name: supabase-keepalive
+
+# Supabase's free tier pauses a project after 7 days of no activity. A single
+# API request resets that clock. This workflow hits the Supabase REST API on a
+# schedule so the project never sleeps — independent of whether the Railway
+# backend is deployed or awake.
+
+on:
+  schedule:
+    # Every 3 days at 06:00 UTC. Well inside the 7-day window, with margin for
+    # GitHub's scheduled-run delays (queued runs can slip by an hour or more).
+    - cron: "0 6 */3 * *"
+  # Lets you trigger it by hand from the Actions tab to test it.
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Touch Supabase REST API
+        run: |
+          # A trivial SELECT against a real table. RLS may return zero rows for
+          # the anon key — that's fine; the query still executes in Postgres,
+          # which is what counts as activity. -f makes curl fail on HTTP errors.
+          curl -fsS \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/hands?select=id&limit=1" \
+            -o /dev/null
+          echo "Supabase pinged OK at $(date -u)"

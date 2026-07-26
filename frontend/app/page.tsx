@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { DIFFICULTIES, Difficulty } from '../lib/difficulties'
+import AuthControl from '../components/AuthControl'
 
 // Suit + rank assignment for each tier. The ranking encodes the stakes
 // ladder (2 → 7 → J → A) and the suits encode the room's archetype:
@@ -55,8 +56,12 @@ function TierCard({ diff }: { diff: Difficulty }) {
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-underground text-white flex flex-col px-6 pt-16 pb-10">
+    <div className="relative min-h-screen bg-underground text-white flex flex-col px-6 pt-16 pb-10">
       {/* Hero ─────────────────────────────────────────────────────────────── */}
+      <div className="absolute top-4 right-6 z-10">
+        <AuthControl />
+      </div>
+
       <header className="text-center max-w-3xl mx-auto">
         <p className="eyebrow mb-4">Texas Hold&apos;em · AI Coaching</p>
         <h1

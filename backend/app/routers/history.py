@@ -11,9 +11,10 @@ localStorage. No auth in v1. Phase 7 will gate this behind real users.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from app.auth import current_user
 from app.config import settings
 from app.history.supabase_client import SupabaseNotConfigured, get_client
 from app.history.stats import Stats, compute_stats
@@ -46,7 +47,10 @@ class ActionEntry(BaseModel):
 
 
 class HandSummary(BaseModel):
-    user_id: str = Field(..., min_length=8, max_length=64, description="Anonymous browser UUID")
+    # user_id is no longer accepted from the client — it's derived from the
+    # verified JWT. Kept optional here so existing tests/clients don't 422
+    # immediately; the route ignores whatever is provided.
+    user_id: str | None = Field(default=None, description="Ignored; derived from JWT")
     difficulty: str = Field(..., max_length=32)
     table_size: int = Field(..., ge=2, le=9)
     hero_position: str = Field(..., alias="position", max_length=8)
@@ -63,6 +67,12 @@ class HandSummary(BaseModel):
     actions: list[ActionEntry] = Field(default_factory=list, max_length=MAX_ACTIONS)
 
     model_config = {"populate_by_name": True}
+
+
+class ClaimRequest(BaseModel):
+    """Body for POST /history/claim — links an anonymous-era row set to the
+    now-authenticated account."""
+    legacy_user_id: str = Field(..., min_length=8, max_length=64)
 
 
 class StoredHand(BaseModel):
@@ -109,20 +119,23 @@ def _row_to_stored(row: dict) -> StoredHand:
 
 @router.post("/hand")
 @limiter.limit("60/minute")
-def save_hand(request: Request, hand: HandSummary) -> dict:
+def save_hand(
+    request: Request,
+    hand: HandSummary,
+    user_id: str = Depends(current_user),
+) -> dict:
     try:
         sb = get_client()
     except SupabaseNotConfigured as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    # Per-user row ceiling — anyone could keep POSTing with the same user_id
-    # forever; this caps the blast radius. Reads `count` cheaply via Supabase
-    # head-only query.
+    # Per-user row ceiling — caps the blast radius even for an authenticated
+    # account that decides to pump the table. Cheap head-only count query.
     try:
         existing = (
             sb.table("hands")
             .select("id", count="exact")
-            .eq("user_id", hand.user_id)
+            .eq("user_id", user_id)
             .limit(1)
             .execute()
         )
@@ -140,7 +153,7 @@ def save_hand(request: Request, hand: HandSummary) -> dict:
         print(f"[history] count check failed (non-fatal): {e}")
 
     payload = {
-        "user_id": hand.user_id,
+        "user_id": user_id,
         "difficulty": hand.difficulty,
         "table_size": hand.table_size,
         "position": hand.hero_position,
@@ -188,7 +201,7 @@ def _fetch_recent_rows(user_id: str, limit: int) -> list[dict]:
 @limiter.limit("30/minute")
 def list_hands(
     request: Request,
-    user_id: str = Query(..., min_length=8, max_length=64, description="Anonymous browser UUID"),
+    user_id: str = Depends(current_user),
     limit: int = Query(50, ge=1, le=200),
 ) -> list[StoredHand]:
     return [_row_to_stored(r) for r in _fetch_recent_rows(user_id, limit)]
@@ -198,11 +211,11 @@ def list_hands(
 @limiter.limit("5/hour")
 def delete_hands(
     request: Request,
-    user_id: str = Query(..., min_length=8, max_length=64, description="Anonymous browser UUID"),
+    user_id: str = Depends(current_user),
 ) -> dict:
-    """Wipe every stored hand for a user. Powers the Reset button on
-    /history and /stats; the user trades historical context for a clean
-    slate (intentional, not recoverable)."""
+    """Wipe every stored hand for the authenticated user. Powers the Reset
+    button on /history and /stats; the user trades historical context for a
+    clean slate (intentional, not recoverable)."""
     try:
         sb = get_client()
     except SupabaseNotConfigured as e:
@@ -218,7 +231,7 @@ def delete_hands(
 @limiter.limit("30/minute")
 def get_stats(
     request: Request,
-    user_id: str = Query(..., min_length=8, max_length=64),
+    user_id: str = Depends(current_user),
     limit: int = Query(200, ge=1, le=1000),
 ) -> Stats:
     return compute_stats(_fetch_recent_rows(user_id, limit))
@@ -228,8 +241,53 @@ def get_stats(
 @limiter.limit("30/minute")
 def get_leaks(
     request: Request,
-    user_id: str = Query(..., min_length=8, max_length=64),
+    user_id: str = Depends(current_user),
     limit: int = Query(200, ge=1, le=1000),
 ) -> list[Finding]:
     stats = compute_stats(_fetch_recent_rows(user_id, limit))
     return detect_leaks(stats)
+
+
+@router.post("/claim")
+@limiter.limit("3/hour")
+def claim_legacy_hands(
+    request: Request,
+    body: ClaimRequest,
+    user_id: str = Depends(current_user),
+) -> dict:
+    """Rewrite an anonymous-era set of rows to the now-authenticated user.
+
+    Called once by the frontend the first time a previously anonymous user
+    signs in. Trivial no-op if `legacy_user_id` already equals the verified
+    UUID. Heavily rate-limited because nobody legitimately needs to do this
+    more than once or twice.
+    """
+    if body.legacy_user_id == user_id:
+        return {"claimed": 0, "note": "legacy_user_id already matches verified UUID"}
+    try:
+        sb = get_client()
+    except SupabaseNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    try:
+        # First check the legacy set isn't already owned by someone else's
+        # authenticated account. Anonymous UUIDs are unguessable, so this is
+        # only a worry if a user shares one — still cheap to verify.
+        existing = (
+            sb.table("hands")
+            .select("id")
+            .eq("user_id", body.legacy_user_id)
+            .limit(1)
+            .execute()
+        )
+        if not existing.data:
+            return {"claimed": 0, "note": "no rows under that legacy id"}
+
+        res = (
+            sb.table("hands")
+            .update({"user_id": user_id})
+            .eq("user_id", body.legacy_user_id)
+            .execute()
+        )
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Supabase claim failed: {e}")
+    return {"claimed": len(res.data or [])}

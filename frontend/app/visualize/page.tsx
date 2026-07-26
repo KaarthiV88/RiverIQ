@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { StoredHand, listHands } from '../../lib/history'
-import { getUserId } from '../../lib/userId'
 import ExpandableCard from '../../components/ExpandableCard'
+import SignInGate from '../../components/SignInGate'
 
 // Streets in the order money flows.
 const STREETS = ['preflop', 'flop', 'turn', 'river', 'showdown'] as const
@@ -488,14 +488,12 @@ function LedgerPanel({ title, eyebrow, children, className = '', expanded = fals
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function VisualizePage() {
+function VisualizePageInner() {
   const [hands, setHands] = useState<StoredHand[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const uid = getUserId()
-    if (!uid) return
-    listHands(uid, 200)
+    listHands(200)
       .then(setHands)
       .catch(err => setError(err.message ?? String(err)))
   }, [])
@@ -655,4 +653,8 @@ export default function VisualizePage() {
       </div>
     </div>
   )
+}
+
+export default function VisualizePage() {
+  return <SignInGate><VisualizePageInner /></SignInGate>
 }

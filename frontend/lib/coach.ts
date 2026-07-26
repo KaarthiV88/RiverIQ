@@ -10,6 +10,8 @@
 
 import { GameState } from '../types/poker'
 
+import { authFetch } from './authFetch'
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
 
 export interface CoachMessage {
@@ -139,7 +141,7 @@ export async function* streamCoachReply(
   signal?: AbortSignal,
   userId?: string | null,
 ): AsyncGenerator<string, void, unknown> {
-  const res = await fetch(`${API_BASE}/coach/chat/stream`, {
+  const res = await authFetch(`${API_BASE}/coach/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, game_context: gameContext, user_id: userId ?? undefined }),

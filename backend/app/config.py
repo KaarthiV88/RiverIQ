@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
+    # The HS256 secret used to sign user-session JWTs. Found in the Supabase
+    # dashboard at Settings → API → JWT Settings → JWT Secret. Different
+    # value from anon/service-role keys.
+    supabase_jwt_secret: str = ""
 
     # Comma-separated list of allowed CORS origins. In dev this defaults to
     # localhost:3000; in prod set CORS_ALLOW_ORIGINS to the deployed frontend
