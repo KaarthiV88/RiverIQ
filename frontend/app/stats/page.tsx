@@ -15,17 +15,17 @@ function fmtAf(v: number | null | undefined): string {
 }
 
 const SEVERITY_STYLE: Record<Finding['severity'], string> = {
-  good: 'border-emerald-500/40 bg-emerald-500/5',
-  watch: 'border-amber-500/40 bg-amber-500/5',
-  leak: 'border-rose-500/50 bg-rose-500/5',
-  insufficient: 'border-white/10 bg-white/2',
+  good: 'sev-good',
+  watch: 'sev-watch',
+  leak: 'sev-leak',
+  insufficient: 'sev-low',
 }
 
 const SEVERITY_LABEL: Record<Finding['severity'], { label: string; color: string }> = {
-  good:         { label: 'HEALTHY',     color: 'text-emerald-300' },
-  watch:        { label: 'WATCH',       color: 'text-amber-300' },
-  leak:         { label: 'LEAK',        color: 'text-rose-300' },
-  insufficient: { label: 'LOW SAMPLE',  color: 'text-white/40' },
+  good:         { label: 'HEALTHY',     color: 'sev-label-good' },
+  watch:        { label: 'WATCH',       color: 'sev-label-watch' },
+  leak:         { label: 'LEAK',        color: 'sev-label-leak' },
+  insufficient: { label: 'LOW SAMPLE',  color: 'sev-label-low' },
 }
 
 function MetricCard({ finding, expanded = false }: { finding: Finding; expanded?: boolean }) {
@@ -34,32 +34,32 @@ function MetricCard({ finding, expanded = false }: { finding: Finding; expanded?
   const sev = SEVERITY_LABEL[finding.severity]
   return (
     <div
-      className={`rounded-2xl border ${SEVERITY_STYLE[finding.severity]} ${
+      className={`ledger-card ${SEVERITY_STYLE[finding.severity]} ${
         expanded
           ? 'h-full w-full flex flex-col justify-center px-14 py-14'
           : 'px-5 py-4'
       }`}
     >
-      <div className={`flex items-baseline justify-between ${expanded ? 'mb-6' : 'mb-1'}`}>
-        <h3 className={`uppercase tracking-wider text-white/60 font-semibold ${expanded ? 'text-3xl' : 'text-sm'}`}>
+      <div className={`flex items-baseline justify-between gap-3 ${expanded ? 'mb-6' : 'mb-1'}`}>
+        <h3 className={`ledger-eyebrow ${expanded ? 'text-2xl' : ''}`}>
           {finding.label}
         </h3>
-        <span className={`font-bold tracking-wider ${sev.color} ${expanded ? 'text-lg' : 'text-[10px]'}`}>{sev.label}</span>
+        <span className={`font-mono font-bold tracking-[0.14em] ${sev.color} ${expanded ? 'text-lg' : 'text-[10px]'}`}>{sev.label}</span>
       </div>
       <div className="flex items-baseline gap-4">
-        <span className={`font-extrabold text-white ${expanded ? 'text-[10rem] md:text-[14rem] leading-none' : 'text-3xl'}`}>
+        <span className={`ledger-figure ${expanded ? 'text-[10rem] md:text-[14rem] leading-none' : 'text-4xl'}`}>
           {valueStr}
         </span>
-        <span className={`text-white/40 ${expanded ? 'text-2xl' : 'text-xs'}`}>n={finding.sample_size}</span>
+        <span className={`font-mono text-[color:var(--ink)]/45 ${expanded ? 'text-2xl' : 'text-xs'}`}>n={finding.sample_size}</span>
       </div>
       {finding.benchmark_low != null && finding.benchmark_high != null && finding.severity !== 'insufficient' && (
-        <div className={`text-white/40 ${expanded ? 'text-xl mt-6' : 'text-xs mt-1'}`}>
+        <div className={`ledger-sub ${expanded ? 'text-xl mt-6' : 'mt-1.5'}`}>
           target {isPct
             ? `${(finding.benchmark_low * 100).toFixed(0)}–${(finding.benchmark_high * 100).toFixed(0)}%`
             : `${finding.benchmark_low}–${finding.benchmark_high}`}
         </div>
       )}
-      <p className={`text-white/75 leading-relaxed ${expanded ? 'text-xl mt-8 max-w-3xl' : 'text-xs mt-2'}`}>
+      <p className={`text-[color:var(--ink)]/72 leading-relaxed ${expanded ? 'text-xl mt-8 max-w-3xl' : 'text-xs mt-2'}`}>
         {finding.explanation}
       </p>
     </div>
@@ -74,26 +74,27 @@ function SummaryTile({
   tone?: 'positive' | 'negative' | 'neutral'
   expanded?: boolean
 }) {
-  const color = tone === 'positive'
-    ? 'text-emerald-300'
+  const toneColor = tone === 'positive'
+    ? 'var(--moss)'
     : tone === 'negative'
-    ? 'text-rose-300'
-    : 'text-white'
+    ? 'var(--wine)'
+    : 'var(--ink)'
   return (
     <div
-      className={`bg-zinc-900/60 border border-white/10 rounded-xl ${
+      className={`ledger-card ${
         expanded
           ? 'h-full w-full flex flex-col justify-center px-14 py-14'
-          : 'px-4 py-3'
+          : 'px-5 py-4'
       }`}
     >
-      <div className={`uppercase tracking-wider text-white/50 ${expanded ? 'text-2xl mb-8' : 'text-xs'}`}>
+      <div className={`ledger-eyebrow ${expanded ? 'text-2xl mb-8' : 'mb-2'}`}>
         {label}
       </div>
       <div
-        className={`font-extrabold ${color} ${
-          expanded ? 'text-[10rem] md:text-[14rem] leading-none' : 'text-3xl mt-1'
+        className={`ledger-figure ${
+          expanded ? 'text-[10rem] md:text-[14rem] leading-none' : 'text-4xl'
         }`}
+        style={{ color: toneColor }}
       >
         {value}
       </div>
@@ -134,28 +135,29 @@ function StatsPageInner() {
   return (
     <div className="min-h-screen bg-underground text-white px-6 py-12">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+        <header className="flex flex-wrap items-start justify-between gap-4 mb-10">
           <div>
-            <Link href="/" className="text-sm text-amber-300 hover:text-amber-200">← Lobby</Link>
-            <h1 className="text-4xl font-bold mt-1 tracking-tight">Your Stats</h1>
-            <p className="text-white/50 text-sm mt-1">Aggregate metrics across your last 200 hands.</p>
+            <Link href="/" className="back-link">← Lobby</Link>
+            <p className="eyebrow mt-3 mb-2">Leak Report · last 200 hands</p>
+            <h1 className="font-display italic text-5xl md:text-6xl tracking-tight text-white">Your Stats</h1>
+            <p className="text-white/55 text-sm mt-2">Where your game holds up, and where it bleeds.</p>
           </div>
           <div className="flex items-center gap-2">
             {hasData && (
               confirmReset ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-rose-300">Erase all stats?</span>
+                  <span className="text-xs text-[color:var(--wine)] font-semibold">Erase all stats?</span>
                   <button
                     onClick={handleReset}
                     disabled={resetting}
-                    className="text-sm font-bold px-3 py-2 rounded-lg bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-black transition"
+                    className="btn-danger-solid"
                   >
                     {resetting ? 'Erasing…' : 'Confirm'}
                   </button>
                   <button
                     onClick={() => setConfirmReset(false)}
                     disabled={resetting}
-                    className="text-sm px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-white/10 transition"
+                    className="btn-ghost"
                   >
                     Cancel
                   </button>
@@ -163,30 +165,20 @@ function StatsPageInner() {
               ) : (
                 <button
                   onClick={() => setConfirmReset(true)}
-                  className="text-sm font-bold px-4 py-2 rounded-lg bg-zinc-900 hover:bg-rose-950 border border-rose-500/30 text-rose-300 hover:text-rose-200 transition"
+                  className="btn-danger"
                   title="Erase all stats (same data backs hand history)"
                 >
                   Reset stats
                 </button>
               )
             )}
-            <Link
-              href="/visualize"
-              className="text-sm font-bold px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-white/10 transition"
-            >
-              Visualize →
-            </Link>
-            <Link
-              href="/history"
-              className="text-sm font-bold px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-white/10 transition"
-            >
-              View History →
-            </Link>
+            <Link href="/visualize" className="btn-ghost">Visualize →</Link>
+            <Link href="/history" className="btn-ghost">History →</Link>
           </div>
-        </div>
+        </header>
 
         {error && (
-          <div className="bg-rose-950/40 border border-rose-500/30 text-rose-300 text-sm rounded-lg px-4 py-3">
+          <div className="alert-error">
             Failed to load stats: {error}
           </div>
         )}
@@ -196,15 +188,10 @@ function StatsPageInner() {
         )}
 
         {stats !== null && !hasData && (
-          <div className="bg-zinc-900/60 border border-white/10 rounded-2xl px-8 py-16 text-center">
-            <p className="text-white/70 text-lg mb-3">No hands yet.</p>
-            <p className="text-white/40 text-sm mb-6">Play a few hands and your stats will populate here.</p>
-            <Link
-              href="/"
-              className="inline-block text-sm font-bold px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black transition"
-            >
-              Pick a table
-            </Link>
+          <div className="ledger-card px-8 py-16 text-center">
+            <p className="ledger-title text-2xl mb-3">No hands yet.</p>
+            <p className="text-[color:var(--ink)]/60 text-sm mb-6">Play a few hands and your stats will populate here.</p>
+            <Link href="/" className="btn-brass">Pick a table</Link>
           </div>
         )}
 
@@ -257,24 +244,24 @@ function StatsPageInner() {
             {/* Per-position breakdown */}
             {stats.per_position.length > 0 && (
               <div>
-                <h2 className="text-lg font-bold mb-3 text-white/80">By Position</h2>
-                <div className="bg-zinc-900/60 border border-white/10 rounded-2xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-zinc-950 text-white/50 uppercase text-xs tracking-wider">
+                <p className="eyebrow mb-3">By Position</p>
+                <div className="ledger-card overflow-hidden px-1 py-1">
+                  <table className="ledger-table">
+                    <thead>
                       <tr>
-                        <th className="text-left px-4 py-2">Pos</th>
-                        <th className="text-right px-4 py-2">Hands</th>
-                        <th className="text-right px-4 py-2">VPIP</th>
-                        <th className="text-right px-4 py-2">PFR</th>
+                        <th>Pos</th>
+                        <th>Hands</th>
+                        <th>VPIP</th>
+                        <th>PFR</th>
                       </tr>
                     </thead>
                     <tbody>
                       {stats.per_position.map(p => (
-                        <tr key={p.position} className="border-t border-white/5">
-                          <td className="px-4 py-2 font-mono font-bold">{p.position}</td>
-                          <td className="px-4 py-2 text-right">{p.hands}</td>
-                          <td className="px-4 py-2 text-right">{fmtPct(p.vpip)}</td>
-                          <td className="px-4 py-2 text-right">{fmtPct(p.pfr)}</td>
+                        <tr key={p.position}>
+                          <td>{p.position}</td>
+                          <td>{p.hands}</td>
+                          <td>{fmtPct(p.vpip)}</td>
+                          <td>{fmtPct(p.pfr)}</td>
                         </tr>
                       ))}
                     </tbody>

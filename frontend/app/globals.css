@@ -897,6 +897,209 @@ body {
   animation: expand-content-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Shared "back office" vocabulary — the lobby/table aesthetic extended to the
+   stats, history, and sign-in pages so the whole product reads as one room.
+   Buttons, form fields, alerts, and data plates all derive from the same
+   ink / parchment / brass / wine / moss tokens rather than default Tailwind.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Return-to-lobby link — quiet brass, mono caps. */
+.back-link {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--brass);
+  transition: color 140ms ease;
+}
+.back-link:hover { color: var(--parchment); }
+
+/* Secondary nav button — brass ghost that fills on hover. */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  color: var(--brass);
+  background: rgba(184, 150, 104, 0.06);
+  border: 1px solid rgba(184, 150, 104, 0.35);
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.btn-ghost:hover {
+  background: rgba(184, 150, 104, 0.16);
+  color: var(--parchment);
+  border-color: rgba(184, 150, 104, 0.55);
+}
+.btn-ghost:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+/* Primary action — struck-brass placard, Bodoni face. */
+.btn-brass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  color: var(--ink);
+  background: linear-gradient(180deg, #c9a468 0%, #8b6b3c 100%);
+  border: 1px solid #5a4423;
+  box-shadow:
+    0 1px 0 rgba(255, 240, 200, 0.25) inset,
+    0 8px 18px -8px rgba(0, 0, 0, 0.7);
+  transition: filter 120ms ease, transform 100ms ease;
+}
+.btn-brass:hover { filter: brightness(1.08); }
+.btn-brass:active { transform: scale(0.98); }
+.btn-brass:disabled { filter: grayscale(0.5) brightness(0.62); cursor: not-allowed; }
+.btn-brass:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+/* Destructive ghost + its filled confirm twin — both in wine. */
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  color: #c98088;
+  background: rgba(138, 28, 42, 0.10);
+  border: 1px solid rgba(138, 28, 42, 0.40);
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.btn-danger:hover {
+  background: rgba(138, 28, 42, 0.22);
+  color: #e7a9ae;
+  border-color: rgba(138, 28, 42, 0.62);
+}
+.btn-danger:focus-visible { outline: 2px solid var(--wine); outline-offset: 2px; }
+.btn-danger-solid {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  color: var(--parchment);
+  background: linear-gradient(180deg, #a52a37 0%, #7a1522 100%);
+  border: 1px solid #4a0f17;
+  box-shadow: 0 1px 0 rgba(255, 200, 200, 0.12) inset;
+  transition: filter 120ms ease, transform 100ms ease;
+}
+.btn-danger-solid:hover { filter: brightness(1.1); }
+.btn-danger-solid:active { transform: scale(0.98); }
+.btn-danger-solid:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Form field — recessed stone with a brass focus ring. */
+.field-input {
+  width: 100%;
+  background: rgba(20, 16, 12, 0.60);
+  border: 1px solid rgba(184, 150, 104, 0.30);
+  border-radius: 8px;
+  color: var(--parchment);
+  padding: 12px 16px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.field-input::placeholder { color: rgba(236, 227, 205, 0.35); }
+.field-input:focus {
+  outline: none;
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px rgba(184, 150, 104, 0.28);
+}
+.field-input:disabled { opacity: 0.5; }
+
+/* Inline alerts. */
+.alert-error {
+  background: rgba(138, 28, 42, 0.14);
+  border: 1px solid rgba(138, 28, 42, 0.42);
+  color: #e0a2a8;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.alert-notice {
+  background: rgba(184, 150, 104, 0.12);
+  border: 1px solid rgba(184, 150, 104, 0.42);
+  color: var(--parchment);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+/* Severity accents for leak findings — mapped to the room palette. The left
+   rule and the label share a color so the verdict reads at a glance. */
+.sev-good  { border-left: 3px solid var(--moss); }
+.sev-watch { border-left: 3px solid var(--brass); }
+.sev-leak  { border-left: 3px solid var(--wine); }
+.sev-low   { border-left: 3px solid rgba(111, 103, 89, 0.55); }
+.sev-label-good  { color: #4d6336; }
+.sev-label-watch { color: var(--brass-soft); }
+.sev-label-leak  { color: var(--wine); }
+.sev-label-low   { color: var(--smoke); }
+
+/* Result plates for the hand log — sit on the dark rows, so tinted-light. */
+.result-plate {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-weight: 700;
+  font-size: 14px;
+  border: 1px solid;
+}
+.result-plate.pos  { background: rgba(59, 74, 43, 0.18);  color: #94ab72; border-color: rgba(59, 74, 43, 0.55); }
+.result-plate.neg  { background: rgba(138, 28, 42, 0.14); color: #cd828a; border-color: rgba(138, 28, 42, 0.48); }
+.result-plate.zero { background: rgba(111, 103, 89, 0.12); color: var(--smoke); border-color: rgba(111, 103, 89, 0.35); }
+
+/* Dark wood log rows for the history feed. */
+.log-row {
+  background: linear-gradient(180deg, rgba(44, 29, 18, 0.55), rgba(26, 16, 9, 0.55));
+  border: 1px solid rgba(184, 150, 104, 0.18);
+  border-radius: 12px;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.log-row:hover {
+  border-color: rgba(184, 150, 104, 0.40);
+  background: linear-gradient(180deg, rgba(54, 36, 22, 0.62), rgba(32, 20, 11, 0.62));
+}
+
+/* Parchment ledger table — for the by-position breakdown. */
+.ledger-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ledger-table thead th {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass-soft);
+  font-weight: 700;
+  padding: 11px 18px;
+  text-align: right;
+  border-bottom: 1px solid rgba(184, 150, 104, 0.30);
+}
+.ledger-table thead th:first-child { text-align: left; }
+.ledger-table tbody td {
+  padding: 10px 18px;
+  text-align: right;
+  color: var(--ink);
+  border-bottom: 1px solid rgba(184, 150, 104, 0.14);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+.ledger-table tbody td:first-child { text-align: left; font-weight: 700; }
+.ledger-table tbody tr:last-child td { border-bottom: 0; }
+.ledger-table tbody tr:hover td { background: rgba(184, 150, 104, 0.07); }
+
 @media (prefers-reduced-motion: reduce) {
   .hud-sweep   { animation: none; opacity: 0; }
   .hud-reticle { animation: none; }

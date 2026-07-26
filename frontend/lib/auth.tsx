@@ -16,10 +16,22 @@ import { getUserId } from './userId'
 
 const CLAIMED_KEY = 'riveriq:legacyClaimed'
 
+/** The name to show for a signed-in user: their chosen username if set,
+ *  otherwise the email local-part, otherwise a neutral fallback. */
+export function displayNameFor(user: User | null): string {
+  const username = (user?.user_metadata?.username as string | undefined)?.trim()
+  if (username) return username
+  const email = user?.email
+  if (email) return email.split('@')[0]
+  return 'Player'
+}
+
 interface AuthState {
   /** undefined = still loading; null = no session; Session = signed in. */
   session: Session | null | undefined
   user: User | null
+  /** Username if chosen at signup, else email local-part, else "Player". */
+  displayName: string
   signOut: () => Promise<void>
   /** Returns the current access token, or null if signed out. */
   getAccessToken: () => string | null
@@ -83,9 +95,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return session?.access_token ?? null
   }, [session])
 
+  const user = session?.user ?? null
   const value: AuthState = {
     session,
-    user: session?.user ?? null,
+    user,
+    displayName: displayNameFor(user),
     signOut,
     getAccessToken,
   }

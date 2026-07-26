@@ -8,7 +8,7 @@ import { useAuth } from '../../lib/auth'
 
 const NEXT_KEY = 'riveriq:postSignInPath'
 
-type Mode = 'signin' | 'signup'
+type Mode = 'signin' | 'signup' | 'verify'
 
 function SignInInner() {
   const router = useRouter()
@@ -16,7 +16,9 @@ function SignInInner() {
   const { session } = useAuth()
   const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -29,7 +31,8 @@ function SignInInner() {
     }
   }, [search])
 
-  // Already signed in? Bounce back to wherever they were.
+  // Already signed in? Bounce back. Fresh sign-ups clear the stash (see
+  // handleSubmit) so they always land on the home page.
   useEffect(() => {
     if (!session) return
     const stashed = typeof window !== 'undefined' ? sessionStorage.getItem(NEXT_KEY) : null
@@ -51,21 +54,29 @@ function SignInInner() {
           password,
         })
         if (error) throw error
-        // onAuthStateChange will populate the session; the redirect effect
-        // above takes over from here.
+        // onAuthStateChange populates the session; the redirect effect takes over.
       } else {
+        const trimmedUsername = username.trim()
+        if (!trimmedUsername) {
+          setError('Pick a username.')
+          return
+        }
+        // New sign-ups always land on the home page — drop any stashed return path.
+        if (typeof window !== 'undefined') sessionStorage.removeItem(NEXT_KEY)
         const { data, error } = await supabase.auth.signUp({
           email: trimmedEmail,
           password,
+          // Stored on auth.users.user_metadata — surfaced as the display name.
+          options: { data: { username: trimmedUsername } },
         })
         if (error) throw error
-        if (!data.session) {
-          // "Confirm email" is on in the dashboard; sign-up succeeded but
-          // no session was issued. Tell the user to check their inbox —
-          // but they shouldn't hit this path in the current config.
-          setNotice(
-            'Account created. Check your email for the confirmation link before signing in.',
-          )
+        if (data.session) {
+          // Email confirmation is off: signed in immediately, redirect effect fires.
+        } else {
+          // Confirmation on: Supabase emailed a 6-digit code. Move to the
+          // verify step; email/username persist in state for verifyOtp.
+          setMode('verify')
+          setNotice(`We sent a code to ${trimmedEmail}. Enter it below to finish.`)
         }
       }
     } catch (err) {
@@ -78,37 +89,167 @@ function SignInInner() {
     }
   }
 
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const token = code.trim()
+    if (token.length < 6) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token,
+        type: 'signup',
+      })
+      if (error) throw error
+      // Success issues a session → redirect effect sends them to the home page.
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[signin] verify error:', err)
+      const e = err as { message?: string } | null
+      setError(e?.message || 'That code didn’t work. Check it and try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const resendCode = async () => {
+    setError(null)
+    setNotice(null)
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email.trim().toLowerCase(),
+      })
+      if (error) throw error
+      setNotice('New code sent. Give it a moment to arrive.')
+    } catch (err) {
+      const e = err as { message?: string } | null
+      setError(e?.message || 'Could not resend the code.')
+    }
+  }
+
   const flip = (next: Mode) => {
     setMode(next)
     setError(null)
     setNotice(null)
+    setCode('')
+    // Leaving a signup for the sign-in screen should restore normal return-path
+    // behavior; entering signup clears it so verified users land home.
+    if (next === 'signup' && typeof window !== 'undefined') {
+      sessionStorage.removeItem(NEXT_KEY)
+    }
   }
 
+  // ─── Verify step ──────────────────────────────────────────────────────────
+  if (mode === 'verify') {
+    return (
+      <div className="min-h-screen bg-underground text-white flex items-center justify-center px-6">
+        <div className="w-full max-w-md">
+          <button
+            onClick={() => flip('signup')}
+            className="back-link"
+          >
+            ← Back
+          </button>
+
+          <p className="eyebrow mt-6 mb-3">Confirm your email</p>
+          <h1 className="font-display italic text-5xl md:text-6xl tracking-tight mb-2">
+            Check your email.
+          </h1>
+          <p className="text-white/55 text-sm leading-relaxed mb-8">
+            Enter the code we sent to <span className="text-[color:var(--parchment)]">{email.trim().toLowerCase()}</span> to
+            confirm it’s really you.
+          </p>
+
+          <form onSubmit={handleVerify} className="space-y-3">
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              // Supabase's OTP length is configurable (6–10). Don't hard-cap at
+              // 6 or a longer code can't be fully typed.
+              maxLength={10}
+              placeholder="Enter code"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              disabled={submitting}
+              className="field-input text-2xl tracking-[0.4em] text-center placeholder:tracking-normal placeholder:text-base"
+            />
+            <button
+              type="submit"
+              disabled={submitting || code.length < 6}
+              className="btn-brass w-full py-3 text-base"
+            >
+              {submitting ? 'Verifying…' : 'Verify & continue'}
+            </button>
+
+            {error && (
+              <div className="alert-error">
+                {error}
+              </div>
+            )}
+            {notice && (
+              <div className="alert-notice">
+                {notice}
+              </div>
+            )}
+          </form>
+
+          <p className="text-sm text-white/55 mt-6 text-center">
+            Didn’t get it?{' '}
+            <button onClick={resendCode} className="text-[color:var(--brass)] hover:text-[color:var(--parchment)] underline-offset-4 hover:underline">
+              Resend code
+            </button>
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── Sign in / Sign up steps ──────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-underground text-white flex items-center justify-center px-6">
       <div className="w-full max-w-md">
-        <Link href="/" className="text-sm text-[color:var(--brass)] hover:text-amber-200">← Lobby</Link>
+        <Link href="/" className="back-link">← Lobby</Link>
 
-        <h1 className="font-display italic text-5xl md:text-6xl tracking-tight mt-3 mb-2">
+        <p className="eyebrow mt-6 mb-3">{mode === 'signin' ? 'Members · Welcome back' : 'New player · Buy in'}</p>
+        <h1 className="font-display italic text-5xl md:text-6xl tracking-tight mb-2">
           {mode === 'signin' ? 'Sit down at the table.' : 'Buy in.'}
         </h1>
         <p className="text-white/55 text-sm leading-relaxed mb-8">
           {mode === 'signin'
             ? 'Welcome back. Your history and stats are right where you left them.'
-            : 'Pick an email and a password. No verification required — you can change either later.'}
+            : 'Pick a username, an email, and a password. We’ll send a 6-digit code to confirm your email.'}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
+          {mode === 'signup' && (
+            <input
+              type="text"
+              required
+              autoFocus
+              autoComplete="username"
+              minLength={3}
+              maxLength={20}
+              placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={submitting}
+              className="field-input text-base"
+            />
+          )}
           <input
             type="email"
             required
-            autoFocus
+            autoFocus={mode === 'signin'}
             autoComplete="email"
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={submitting}
-            className="w-full bg-zinc-900 border border-white/15 rounded-lg px-4 py-3 text-white text-base placeholder:text-white/35 focus:outline-none focus:border-amber-400 disabled:opacity-50"
+            className="field-input text-base"
           />
           <input
             type="password"
@@ -119,12 +260,17 @@ function SignInInner() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={submitting}
-            className="w-full bg-zinc-900 border border-white/15 rounded-lg px-4 py-3 text-white text-base placeholder:text-white/35 focus:outline-none focus:border-amber-400 disabled:opacity-50"
+            className="field-input text-base"
           />
           <button
             type="submit"
-            disabled={submitting || !email.trim() || password.length < 6}
-            className="w-full px-4 py-3 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-white/30 active:scale-[0.99] text-black font-bold rounded-lg text-base transition"
+            disabled={
+              submitting ||
+              !email.trim() ||
+              password.length < 6 ||
+              (mode === 'signup' && username.trim().length < 3)
+            }
+            className="btn-brass w-full py-3 text-base"
           >
             {submitting
               ? (mode === 'signin' ? 'Signing in…' : 'Creating account…')
@@ -132,12 +278,12 @@ function SignInInner() {
           </button>
 
           {error && (
-            <div className="bg-rose-950/40 border border-rose-500/30 text-rose-300 text-sm rounded-lg px-3 py-2">
+            <div className="alert-error">
               {error}
             </div>
           )}
           {notice && (
-            <div className="bg-amber-950/40 border border-amber-500/30 text-amber-200 text-sm rounded-lg px-3 py-2">
+            <div className="alert-notice">
               {notice}
             </div>
           )}
@@ -145,9 +291,9 @@ function SignInInner() {
 
         <p className="text-sm text-white/55 mt-6 text-center">
           {mode === 'signin' ? (
-            <>New here? <button onClick={() => flip('signup')} className="text-[color:var(--brass)] hover:text-amber-200 underline-offset-4 hover:underline">Create an account</button></>
+            <>New here? <button onClick={() => flip('signup')} className="text-[color:var(--brass)] hover:text-[color:var(--parchment)] underline-offset-4 hover:underline">Create an account</button></>
           ) : (
-            <>Already have one? <button onClick={() => flip('signin')} className="text-[color:var(--brass)] hover:text-amber-200 underline-offset-4 hover:underline">Sign in instead</button></>
+            <>Already have one? <button onClick={() => flip('signin')} className="text-[color:var(--brass)] hover:text-[color:var(--parchment)] underline-offset-4 hover:underline">Sign in instead</button></>
           )}
         </p>
       </div>

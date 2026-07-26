@@ -510,8 +510,9 @@ function VisualizePageInner() {
       <div className="max-w-6xl mx-auto">
         <header className="flex flex-wrap items-start justify-between gap-4 mb-10">
           <div>
-            <Link href="/" className="text-sm text-[color:var(--brass)] hover:text-amber-200">← Lobby</Link>
-            <h1 className="font-display italic text-5xl md:text-6xl tracking-tight mt-1 text-white">
+            <Link href="/" className="back-link">← Lobby</Link>
+            <p className="eyebrow mt-3 mb-2">The Session · last 200 hands</p>
+            <h1 className="font-display italic text-5xl md:text-6xl tracking-tight text-white">
               The Session
             </h1>
             <p className="text-white/55 text-sm mt-2 max-w-md leading-relaxed">
@@ -519,23 +520,13 @@ function VisualizePageInner() {
             </p>
           </div>
           <nav className="flex items-center gap-2">
-            <Link
-              href="/history"
-              className="text-sm font-bold px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-white/10 transition"
-            >
-              History
-            </Link>
-            <Link
-              href="/stats"
-              className="text-sm font-bold px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-white/10 transition"
-            >
-              Stats
-            </Link>
+            <Link href="/history" className="btn-ghost">History</Link>
+            <Link href="/stats" className="btn-ghost">Stats</Link>
           </nav>
         </header>
 
         {error && (
-          <div className="bg-rose-950/40 border border-rose-500/30 text-rose-300 text-sm rounded-lg px-4 py-3 mb-6">
+          <div className="alert-error mb-6">
             Failed to load: {error}
           </div>
         )}
@@ -550,12 +541,7 @@ function VisualizePageInner() {
             <p className="text-[color:var(--ink)]/60 text-sm mb-6 max-w-sm mx-auto">
               Play your first hand and the curve starts here.
             </p>
-            <Link
-              href="/"
-              className="inline-block text-sm font-bold px-5 py-2.5 rounded-lg bg-[color:var(--brass)] hover:brightness-110 text-[color:var(--ink)] transition"
-            >
-              Pick a table
-            </Link>
+            <Link href="/" className="btn-brass">Pick a table</Link>
           </div>
         )}
 

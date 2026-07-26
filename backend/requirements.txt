@@ -14,4 +14,4 @@ torchaudio
 groq
 supabase
 slowapi
-pyjwt
+pyjwt[crypto]

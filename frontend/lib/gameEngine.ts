@@ -307,11 +307,15 @@ export function dealNewHand(state: GameState, opts: DealOptions = {}): GameState
 
   const firstToAct = getNextActiveIndex(positioned, bbIndex)
 
+  // Sum the blinds that were actually posted — a short stack posts less than a
+  // full blind (and is all-in), so the pot can't assume SB+BB flat.
+  const postedBlinds = positioned.reduce((sum, p) => sum + p.totalBetThisHand, 0)
+
   return {
     ...state,
     players: positioned,
     communityCards: [],
-    pot: SMALL_BLIND + BIG_BLIND,
+    pot: postedBlinds,
     street: 'preflop',
     phase: 'playing',
     currentPlayerIndex: firstToAct,
@@ -380,29 +384,96 @@ export function advanceStreet(state: GameState): GameState {
 
 // ─── Winner Determination ─────────────────────────────────────────────────────
 
-export function determineWinners(state: GameState): GameState {
-  const eligible = state.players.filter(p => p.status !== 'folded' && wasDealtIn(p))
+interface SidePot {
+  amount: number
+  eligibleIds: string[]   // players who can win this layer: contributed to it AND not folded
+}
 
-  if (eligible.length === 1) {
-    const winner = eligible[0]
-    const players = state.players.map(p =>
-      p.id === winner.id ? { ...p, chips: p.chips + state.pot } : p
-    )
-    return { ...state, players, winners: [winner.id], street: 'showdown', phase: 'showdown' }
+/** Split every chip wagered this hand into a stack of pots, using each
+ *  player's `totalBetThisHand` as their contribution.
+ *
+ *  Each distinct contribution level defines a layer. A layer's chips come from
+ *  everyone who put in at least that much (folded players included — their
+ *  chips are dead money), but only non-folded contributors are eligible to win
+ *  it. A consequence that falls out for free: an all-in overbet nobody matched
+ *  becomes a top layer with a single eligible player, i.e. the uncalled portion
+ *  is returned to the bettor.
+ */
+function buildSidePots(players: Player[]): SidePot[] {
+  const contributors = players.filter(p => wasDealtIn(p) && p.totalBetThisHand > 0)
+  if (contributors.length === 0) return []
+
+  const levels = Array.from(new Set(contributors.map(p => p.totalBetThisHand)))
+    .sort((a, b) => a - b)
+
+  const pots: SidePot[] = []
+  let prev = 0
+  for (const level of levels) {
+    const atLeast = contributors.filter(p => p.totalBetThisHand >= level)
+    const amount = (level - prev) * atLeast.length
+    if (amount > 0) {
+      const eligibleIds = atLeast.filter(p => p.status !== 'folded').map(p => p.id)
+      pots.push({ amount, eligibleIds })
+    }
+    prev = level
+  }
+  return pots
+}
+
+export function determineWinners(state: GameState): GameState {
+  const contested = state.players.filter(p => p.status !== 'folded' && wasDealtIn(p))
+
+  // Uncontested — everyone else folded. The lone player scoops every wagered
+  // chip (including dead money), no showdown required.
+  if (contested.length <= 1) {
+    const winner = contested[0]
+    const players = winner
+      ? state.players.map(p => (p.id === winner.id ? { ...p, chips: p.chips + state.pot } : p))
+      : state.players
+    return {
+      ...state,
+      players,
+      winners: winner ? [winner.id] : [],
+      street: 'showdown',
+      phase: 'showdown',
+    }
   }
 
-  const scored = eligible.map(p => ({
-    id: p.id,
-    score: getBestHandScore(p.holeCards, state.communityCards),
-  }))
-  const best = Math.max(...scored.map(s => s.score))
-  const winnerIds = scored.filter(s => s.score === best).map(s => s.id)
-  const share = Math.floor(state.pot / winnerIds.length)
+  // Best 5-card score for each contender, computed once.
+  const scoreById = new Map<string, number>()
+  for (const p of contested) {
+    scoreById.set(p.id, getBestHandScore(p.holeCards, state.communityCards))
+  }
+  const seatById = new Map(state.players.map(p => [p.id, p.seatIndex]))
+
+  const payouts = new Map<string, number>()
+  const winnerSet = new Set<string>()
+
+  for (const pot of buildSidePots(state.players)) {
+    // Only contenders (non-folded, dealt-in) can take a pot. In a real showdown
+    // every layer has at least one; the guard is defensive against chip loss.
+    const eligible = pot.eligibleIds.filter(id => scoreById.has(id))
+    if (eligible.length === 0) continue
+
+    const best = Math.max(...eligible.map(id => scoreById.get(id)!))
+    const winners = eligible
+      .filter(id => scoreById.get(id) === best)
+      .sort((a, b) => (seatById.get(a)! - seatById.get(b)!))   // deterministic odd-chip order
+
+    const share = Math.floor(pot.amount / winners.length)
+    let remainder = pot.amount - share * winners.length        // odd chips: earliest seat first
+    for (const id of winners) {
+      const extra = remainder > 0 ? 1 : 0
+      remainder -= extra
+      payouts.set(id, (payouts.get(id) ?? 0) + share + extra)
+      winnerSet.add(id)
+    }
+  }
 
   const players = state.players.map(p =>
-    winnerIds.includes(p.id) ? { ...p, chips: p.chips + share } : p
+    payouts.has(p.id) ? { ...p, chips: p.chips + payouts.get(p.id)! } : p
   )
-  return { ...state, players, winners: winnerIds, street: 'showdown', phase: 'showdown' }
+  return { ...state, players, winners: [...winnerSet], street: 'showdown', phase: 'showdown' }
 }
 
 // ─── Process Action ───────────────────────────────────────────────────────────

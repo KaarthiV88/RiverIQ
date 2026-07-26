@@ -5,10 +5,10 @@ import { useState } from 'react'
 import { useAuth } from '../lib/auth'
 
 /** Top-right pill on the lobby: "Sign in" when signed out, or the user's
- *  email with a small sign-out caret when signed in. Quiet by default; the
+ *  username with a small sign-out caret when signed in. Quiet by default; the
  *  intent is for it to fade into the candlelit room aesthetic. */
 export default function AuthControl() {
-  const { session, user, signOut } = useAuth()
+  const { session, displayName, signOut } = useAuth()
   const [open, setOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
 
@@ -27,21 +27,19 @@ export default function AuthControl() {
     )
   }
 
-  const email = user?.email ?? 'Signed in'
-
   return (
     <div className="relative">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="text-sm px-4 py-2 rounded-lg bg-zinc-900/70 hover:bg-zinc-800 border border-white/15 text-white/85 transition flex items-center gap-2"
+        className="text-sm px-4 py-2 rounded-lg bg-[rgba(20,16,12,0.7)] hover:bg-[rgba(30,24,16,0.8)] border border-[rgba(184,150,104,0.3)] hover:border-[rgba(184,150,104,0.5)] text-[color:var(--parchment)]/85 transition flex items-center gap-2"
       >
-        <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
-        <span className="font-mono">{email}</span>
-        <span className="text-white/40">▾</span>
+        <span className="inline-block w-2 h-2 rounded-full bg-[#94ab72]" />
+        <span className="font-mono">{displayName}</span>
+        <span className="text-[color:var(--brass)]/60">▾</span>
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-44 rounded-lg border border-white/15 bg-zinc-950 shadow-xl py-1 z-50">
+        <div className="absolute right-0 mt-2 w-44 rounded-lg border border-[rgba(184,150,104,0.25)] bg-[#14100c] shadow-xl py-1 z-50">
           <button
             type="button"
             disabled={signingOut}
@@ -56,7 +54,7 @@ export default function AuthControl() {
                 setOpen(false)
               }
             }}
-            className="w-full text-left px-3 py-2 text-sm text-white/80 hover:bg-white/5 disabled:opacity-50"
+            className="w-full text-left px-3 py-2 text-sm text-[color:var(--parchment)]/80 hover:bg-[rgba(184,150,104,0.1)] disabled:opacity-50"
           >
             {signingOut ? 'Signing out…' : 'Sign out'}
           </button>
