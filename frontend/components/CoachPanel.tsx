@@ -65,8 +65,11 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
     if (!panel || !parent) return
     const GAP = 12 // matches the old `right-3` / `left-3` spacing
     const update = () => {
-      const pw = parent.getBoundingClientRect().width
-      const w = panel.getBoundingClientRect().width
+      // offsetWidth reports the untransformed layout width. getBoundingClientRect
+      // would return the *scaled* width while the panel is closed (scale-50),
+      // docking it too far right until the first side-toggle re-measured it.
+      const pw = parent.offsetWidth
+      const w = panel.offsetWidth
       setLeftPx(side === 'right' ? pw - w - GAP : GAP)
     }
     update()
@@ -74,7 +77,7 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
     ro.observe(parent)
     ro.observe(panel)
     return () => ro.disconnect()
-  }, [side])
+  }, [side, open])
 
   const isReview = gameState.phase === 'showdown'
   const quickActions = isReview ? REVIEW_ACTIONS : LIVE_ACTIONS
