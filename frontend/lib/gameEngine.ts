@@ -135,6 +135,41 @@ export function getBestHandScore(holeCards: Card[], communityCards: Card[]): num
   return Math.max(...combinations(all, 5).map(scoreFiveCards))
 }
 
+// Category index (0–8) → name. Mirrors the tiers scored in scoreFiveCards.
+const HAND_CATEGORY_NAMES = [
+  'High Card', 'Pair', 'Two Pair', 'Three of a Kind',
+  'Straight', 'Flush', 'Full House', 'Four of a Kind', 'Straight Flush',
+]
+const RANK_LABELS: Record<number, string> = {
+  14: 'Ace', 13: 'King', 12: 'Queen', 11: 'Jack', 10: 'Ten',
+  9: 'Nine', 8: 'Eight', 7: 'Seven', 6: 'Six', 5: 'Five', 4: 'Four', 3: 'Three', 2: 'Two',
+}
+
+// Human-readable name of a player's best five-card hand — e.g. "Flush",
+// "Full House", "Ace high", "Royal Flush". Returns '' when fewer than five
+// cards are available (an uncontested preflop win), where no hand is shown.
+export function describeBestHand(holeCards: Card[], communityCards: Card[]): string {
+  const all = [...holeCards, ...communityCards]
+  if (all.length < 5) return ''
+  const B = 15
+  let bestScore = -1
+  let bestCombo: Card[] = []
+  for (const combo of combinations(all, 5)) {
+    const s = scoreFiveCards(combo)
+    if (s > bestScore) { bestScore = s; bestCombo = combo }
+  }
+  const category = Math.floor(bestScore / B ** 5)
+  if (category === 0) {
+    const high = Math.max(...bestCombo.map(rankValue))
+    return `${RANK_LABELS[high]} high`
+  }
+  if (category === 8) {
+    // straightHigh is the low-order part of the score; 14 ⇒ ace-high ⇒ royal.
+    return bestScore - 8 * B ** 5 === 14 ? 'Royal Flush' : 'Straight Flush'
+  }
+  return HAND_CATEGORY_NAMES[category]
+}
+
 // ─── Navigation Helpers ───────────────────────────────────────────────────────
 
 function getNextActiveIndex(players: Player[], from: number): number {

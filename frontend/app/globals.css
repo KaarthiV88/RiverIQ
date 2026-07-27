@@ -1100,7 +1100,48 @@ body {
 .ledger-table tbody tr:last-child td { border-bottom: 0; }
 .ledger-table tbody tr:hover td { background: rgba(184, 150, 104, 0.07); }
 
+/* ── Showdown winner banner — parchment placard that replaces the pot when a
+   hand is won, then gives way to the pot again on the next deal. ──────────── */
+.winner-banner {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 90vw;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse 130% 100% at 50% 0%, rgba(255, 245, 215, 0.6), transparent 65%),
+    var(--parchment);
+  color: var(--ink);
+  border: 1px solid rgba(184, 150, 104, 0.6);
+  box-shadow:
+    0 1px 0 rgba(255, 240, 200, 0.4) inset,
+    0 10px 24px -10px rgba(0, 0, 0, 0.8),
+    0 0 26px rgba(184, 150, 104, 0.28);
+  white-space: nowrap;
+  animation: winner-banner-in 380ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.winner-lead {
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.winner-hand {
+  font-family: var(--font-bodoni), Georgia, serif;
+  font-weight: 900;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  color: var(--wine);
+}
+@keyframes winner-banner-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.94); }
+  to   { opacity: 1; transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .winner-banner { animation: none; }
   .hud-sweep   { animation: none; opacity: 0; }
   .hud-reticle { animation: none; }
   .tier-card,

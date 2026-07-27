@@ -1,13 +1,45 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { GameState, ActionType } from '../types/poker'
+import { GameState, ActionType, Player } from '../types/poker'
+import { describeBestHand } from '../lib/gameEngine'
 import PlayerSeat from './PlayerSeat'
 import CommunityCards from './CommunityCards'
 import PotDisplay from './PotDisplay'
 import ActionPanel from './ActionPanel'
 import Chip from './Chip'
 import BetStack from './BetStack'
+
+// Parchment placard that replaces the pot at showdown: who won, and with what.
+function WinnerBanner({ lead, hand }: { lead: string; hand: string }) {
+  return (
+    <div className="winner-banner">
+      <span className="winner-lead">{lead}</span>
+      {hand && <span className="winner-hand">{hand}</span>}
+    </div>
+  )
+}
+
+// Build the showdown announcement from the resolved state. Contested pots name
+// the winning hand ("Tom Dwan wins with Flush"); a fold-out win just takes the
+// pot; a chopped pot reads "Split pot".
+function winnerBanner(state: GameState): { lead: string; hand: string } | null {
+  if (state.phase !== 'showdown' || state.winners.length === 0) return null
+  const winners = state.winners
+    .map(id => state.players.find(p => p.id === id))
+    .filter((p): p is Player => !!p)
+  if (winners.length === 0) return null
+  if (winners.length > 1) return { lead: 'Split pot', hand: '' }
+
+  const w = winners[0]
+  const contested = state.players.filter(
+    p => p.status === 'active' || p.status === 'all-in',
+  ).length > 1
+  const hand = contested ? describeBestHand(w.holeCards, state.communityCards) : ''
+  return hand
+    ? { lead: `${w.name} wins with`, hand }
+    : { lead: `${w.name} wins the pot`, hand: '' }
+}
 
 interface PokerTableProps {
   state: GameState
@@ -62,6 +94,7 @@ export default function PokerTable({
 }: PokerTableProps) {
   const n = state.players.length
   const isShowdown = state.phase === 'showdown'
+  const banner = winnerBanner(state)
 
   // Player whose turn it currently is — used for the "waiting" indicator above
   // the table when it isn't the human's turn.
@@ -106,7 +139,9 @@ export default function PokerTable({
           {/* Center area: community cards + pot. */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-3">
             <CommunityCards cards={state.communityCards} />
-            <PotDisplay amount={state.pot} />
+            {banner
+              ? <WinnerBanner lead={banner.lead} hand={banner.hand} />
+              : <PotDisplay amount={state.pot} />}
           </div>
         </div>
 
