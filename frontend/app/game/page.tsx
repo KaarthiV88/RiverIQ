@@ -315,7 +315,7 @@ function GamePageInner() {
   const humanIsSittingOut = human?.status === 'sitting-out'
 
   return (
-    <div className="min-h-screen bg-underground py-6 px-4 text-white">
+    <div className="h-[100dvh] bg-underground px-4 text-white flex flex-col overflow-hidden">
       <div className="fixed top-4 left-4 z-40 bg-black/70 backdrop-blur-md rounded-xl px-4 py-2 border border-white/15 shadow-lg flex items-center gap-3">
         <div>
           <div className="text-xs uppercase tracking-wider text-white/50">Table</div>

@@ -110,7 +110,7 @@ export default function PokerTable({
   // they sit at the top of the table ellipse. Adding generous top padding to
   // the outer wrapper gives them breathing room without distorting the felt.
   return (
-    <div className="relative w-full max-w-7xl mx-auto pt-24 pb-4">
+    <div className="relative w-full max-w-7xl mx-auto flex-1 min-h-0 flex flex-col">
       {/* Floating "thinking" indicator above the table. */}
       {showWaiting && (
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-black/75 backdrop-blur-md border border-white/15 rounded-full px-4 py-2 shadow-xl">
@@ -120,7 +120,15 @@ export default function PokerTable({
           </span>
         </div>
       )}
-      <div className="relative aspect-[16/7.4]">
+      {/* Table area fills the space left between the top HUD and the action
+          panel, and centers the felt. The felt is aspect-locked; capping its
+          width by a viewport-height expression means it shrinks to fit short
+          screens instead of pushing the action panel off-screen. */}
+      <div className="flex-1 min-h-0 flex items-center justify-center pt-16 pb-1">
+      <div
+        className="relative aspect-[16/7.4] w-full"
+        style={{ maxWidth: 'min(100%, calc((100dvh - 300px) * 16 / 7.4))' }}
+      >
         {/* Outer rail — oak wood with grain. */}
         <div className="table-rail absolute inset-0 rounded-[50%] shadow-2xl" />
 
@@ -245,11 +253,13 @@ export default function PokerTable({
             visually belongs to the HUD instead of floating in the viewport. */}
         {chatPanel}
       </div>
+      </div>
 
-      {/* Action panel below the human seat. Reserves vertical space so the
-          page doesn't jump when the panel returns null (bot turns / pacing). */}
+      {/* Action panel below the human seat. Fixed-height, non-shrinking row so
+          the table above never steals its space and the page never scrolls;
+          the reserve also stops layout jump when the panel returns null. */}
       {onAction && (
-        <div className="flex justify-center mt-6 min-h-[180px]">
+        <div className="flex justify-center items-start shrink-0 pt-1 pb-2 min-h-[160px]">
           <ActionPanel state={state} onAction={onAction} disabled={isDealing} />
         </div>
       )}
