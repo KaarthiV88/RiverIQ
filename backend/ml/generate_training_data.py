@@ -49,6 +49,7 @@ def sample_example() -> tuple[np.ndarray, int, float]:
     street = random.choice(STREETS)
     board = deck[2 : 2 + BOARD_SIZE[street]]
 
+
     big_blind = 20.0
     pot = random.uniform(big_blind * 1.5, big_blind * 250)
     player_chips = random.uniform(big_blind * 5, big_blind * 250)
