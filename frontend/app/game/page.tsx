@@ -85,6 +85,10 @@ function GamePageInner() {
     if (handStartChipsRef.current !== null) return
     const human = state.players.find(p => p.isHuman)
     if (!human) return
+    // Hands the hero sat out (or was busted for) aren't hands they played —
+    // snapshotting here would persist a hole-card-less row that inflates
+    // hands_played and drags VPIP/PFR toward zero.
+    if (human.status === 'sitting-out' || human.status === 'busted') return
     // Add back whatever the hero already put in this street (blinds posted
     // before phase flipped to 'playing' on the very first action) so the
     // snapshot is the *pre-blind* starting stack.
@@ -100,6 +104,12 @@ function GamePageInner() {
     if (starting === null) return
 
     savedHandRef.current = true
+    // Clear the snapshot up front so the next 'playing' transition re-takes it.
+    // Doing this only on the success path left a stale value behind whenever
+    // the payload came back null, which then mis-computed the *next* hand's
+    // starting stack (and so its net result).
+    handStartChipsRef.current = null
+
     const payload = buildHandSummary(state, styleId, starting)
     if (!payload) return
 
@@ -107,8 +117,6 @@ function GamePageInner() {
       // Non-fatal — the game keeps running even if persistence is down.
       console.warn('saveHand failed:', err)
     })
-    // Reset the start snapshot now so the next 'playing' transition resets it.
-    handStartChipsRef.current = null
   }, [state, styleId])
 
   const isDealing = !!state && dealtCount < (state.players.length * 2)

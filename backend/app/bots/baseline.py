@@ -65,8 +65,13 @@ def _build_value_bet(ctx: DecisionContext, profile: PersonalityProfile, is_prefl
         if is_preflop else
         ctx.pot * profile.cbet_pot_frac
     )
+    # Floor is the raise-*to* total (current_bet + min_raise), not the bare
+    # increment — matching _build_raise_over_bet / _build_check_raise. Flooring
+    # at ctx.min_raise alone can emit an under-raise whenever the sizing lands
+    # below a legal minimum (e.g. a small open_size_bb into a live blind).
+    min_raise_total = ctx.current_bet + ctx.min_raise
     cap = _max_total_commit(ctx)
-    final = max(ctx.min_raise, min(int(raw), int(cap)))
+    final = max(min_raise_total, min(int(raw), int(cap)))
     return Decision(action="raise", amount=float(final))
 
 
@@ -76,8 +81,9 @@ def _build_bluff(ctx: DecisionContext, profile: PersonalityProfile, is_preflop: 
         if is_preflop else
         ctx.pot * profile.cbet_pot_frac * 0.75
     )
+    min_raise_total = ctx.current_bet + ctx.min_raise
     cap = _max_total_commit(ctx)
-    final = max(ctx.min_raise, min(int(raw), int(cap)))
+    final = max(min_raise_total, min(int(raw), int(cap)))
     return Decision(action="raise", amount=float(final))
 
 

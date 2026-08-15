@@ -531,11 +531,18 @@ export function processAction(state: GameState, action: ActionType, amount: numb
     pot += callAmount
     if (updated.chips === 0) updated.status = 'all-in'
   } else {
-    const additional = Math.min(amount - player.currentBet, player.chips)
-    const raise = (player.currentBet + additional) - currentBet
-    minRaise = Math.max(raise, BIG_BLIND)
-    currentBet = player.currentBet + additional
-    updated = { ...updated, chips: updated.chips - additional, currentBet: currentBet, totalBetThisHand: updated.totalBetThisHand + additional }
+    // Clamp to what this player can actually put in. The lower bound matters:
+    // a raise amount below what they've already committed would otherwise be
+    // negative and *refund* chips to them.
+    const additional = Math.max(0, Math.min(amount - player.currentBet, player.chips))
+    const newPlayerBet = player.currentBet + additional
+    // A short all-in that doesn't reach the current bet isn't a raise — it must
+    // not lower the bar (or reopen the betting) for the players behind.
+    if (newPlayerBet > currentBet) {
+      minRaise = Math.max(newPlayerBet - currentBet, BIG_BLIND)
+      currentBet = newPlayerBet
+    }
+    updated = { ...updated, chips: updated.chips - additional, currentBet: newPlayerBet, totalBetThisHand: updated.totalBetThisHand + additional }
     pot += additional
     if (updated.chips === 0) updated.status = 'all-in'
   }
