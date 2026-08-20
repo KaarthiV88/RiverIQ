@@ -16,6 +16,18 @@ class Settings(BaseSettings):
     # value from anon/service-role keys.
     supabase_jwt_secret: str = ""
 
+    # ── Coach LLM ────────────────────────────────────────────────────────────
+    # Env-driven so a vendor deprecation or a rate-limit spike can be worked
+    # around from the hosting dashboard, without a code change and redeploy.
+    # (Groq retired llama-3.3-70b-versatile out from under this app once.)
+    groq_model: str = "openai/gpt-oss-120b"
+    # Used automatically when the primary returns 404 (retired) or 429
+    # (throttled). Set empty to disable failover and surface the error instead.
+    groq_fallback_model: str = "groq/compound-mini"
+    # Optional: point at any OpenAI-compatible provider (Gemini, Cerebras,
+    # OpenRouter) by overriding the base URL and GROQ_API_KEY together.
+    groq_base_url: str = ""
+
     # Comma-separated list of allowed CORS origins. In dev this defaults to
     # localhost:3000; in prod set CORS_ALLOW_ORIGINS to the deployed frontend
     # URL (and any preview URLs you want to permit).
