@@ -9,7 +9,7 @@ Texas Hold'em AI Coaching Platform — analyze your play, find leaks, and get re
 | Frontend | Next.js (Vercel) |
 | Backend | FastAPI (Fly.io / Render) |
 | Database | Supabase (Postgres) |
-| LLM | Groq API — Llama 3 |
+| LLM | Groq API — GPT-OSS 120B |
 | Equity Engine | treys (Monte Carlo simulation) |
 
 ## Features
@@ -62,6 +62,6 @@ SUPABASE_SERVICE_ROLE_KEY=
 ## AI Concepts Demonstrated
 
 - **Monte Carlo simulation** — probabilistic equity calculation across random board runouts
-- **LLM prompt engineering** — structured hand state injected into Llama 3 context for coaching
+- **LLM prompt engineering** — structured hand state injected into the LLM context for coaching
 - **RAG-lite pattern** — hand history retrieved from Postgres and injected into LLM context for leak detection
 - **Async API design** — FastAPI async handlers for non-blocking LLM and DB calls

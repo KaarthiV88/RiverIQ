@@ -15,10 +15,17 @@ from groq import AsyncGroq
 
 from app.config import settings
 
-# Llama 3.3 70B on Groq: highest quality of the Llama 3 family they host,
-# still fast enough to feel snappy. Swap to llama-3.1-8b-instant for the
-# cheapest path if quality is acceptable.
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
+# Groq decommissioned the Llama 3.x family; gpt-oss-120b is the strongest
+# general-purpose chat model they now host. Swap to openai/gpt-oss-20b for a
+# cheaper/faster path if quality is acceptable.
+#
+# It's a *reasoning* model: without an explicit effort setting it spends the
+# token budget thinking and can return empty `content`. "low" keeps the
+# chain-of-thought to a few tokens so the coach answers directly. Reasoning
+# text arrives on a separate `reasoning` field and never lands in `content`,
+# so the streaming loop below stays clean.
+DEFAULT_MODEL = "openai/gpt-oss-120b"
+REASONING_EFFORT = "low"
 
 _client = AsyncGroq(api_key=settings.groq_api_key)
 
@@ -30,6 +37,7 @@ async def chat(messages: list[dict], model: str = DEFAULT_MODEL) -> str:
         messages=messages,
         temperature=0.4,
         max_tokens=600,
+        reasoning_effort=REASONING_EFFORT,
     )
     return completion.choices[0].message.content or ""
 
@@ -44,6 +52,7 @@ async def stream_chat(
         messages=messages,
         temperature=0.4,
         max_tokens=600,
+        reasoning_effort=REASONING_EFFORT,
         stream=True,
     )
     async for chunk in stream:

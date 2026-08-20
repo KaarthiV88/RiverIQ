@@ -215,7 +215,7 @@ export default function CoachPanel({ open, onClose, gameState, onStreamingChange
           <div className="flex items-center gap-2">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
             <h2 className="text-lg font-bold text-white">Coach</h2>
-            <span className="text-xs text-white/40 font-mono ml-1">Llama 3</span>
+            <span className="text-xs text-white/40 font-mono ml-1">GPT-OSS 120B</span>
             {isReview && (
               <span className="ml-2 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold">
                 Review
